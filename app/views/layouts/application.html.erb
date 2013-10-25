@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title><%= content_for?(:title) ? yield(:title) : "MoviesApp" %></title>
+        <%= csrf_meta_tags %>
+
+        <!-- Le HTML5 shim, for IE6-8 support of HTML elements -->
+        <!--[if lt IE 9]>
+          <script src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/3.6.1/html5shiv.js" type="text/javascript"></script>
+        <![endif]-->
+
+        <%= stylesheet_link_tag "application", :media => "all" %>
+
+        <%= javascript_include_tag "application" %>
+    </head>
+
+    <body>
+        <div class="navbar navbar-inverse navbar-fixed-top">
+            <div class="navbar-inner">
+                <div class="container">
+                    <a class="btn btn-navbar" data-target=".nav-collapse" data-toggle="collapse">
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </a>
+                    <%= link_to "MoviesApp", '/', :onclick => 'AppViewInst.showPage(1)', class:'brand' %>
+
+                    <div class="container nav-collapse">
+                        <ul class="nav pull-right">     
+                            <li><%= if cookies['token'] == nil
+                                        link_to"Sign in", :action => "sign_in"
+                                    else
+                                        link_to"Sign out", :action => "sign_out"
+                                    end %>
+                            </li>
+                        </ul>                        
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="pagination" class="row-fluid">
+            <a id="prevPage">Prev</a>
+            <a id="nextPage">Next</a>
+        </div>
+
+        <div id="content" class="container">
+            <div class="span9 testa">
+                <%= yield %>    
+            </div>        
+        </div>
+
+        <footer style="text-align: center">
+            <p>&copy; Merb 2013</p>
+        </footer>
+
+    </body>
+</html>
+
+
+<!-- Templates -->
+
+<script type="text/template" id="movie-template">
+    <h3 class='movie-title'>
+        {{=model.title}}
+    </h3>
+    <img alt='A' src={{= model.img_url }} class="img-circle">
+</script>
+
+
+<script type="text/template" id="add-movie-template">
+    <div>
+        <h3>Create new movie</h3>
+
+        <form enctype="multipart/form-data" id="new_movie_form" name="movie" method="POST" >
+
+            <div class="control-group">
+                <label class="control-label" for="movie_title">Title</label>
+                <div class="controls">
+                <input class="text_field" id="movie_title" name="movie[title]" size="30" type="text" required="true">
+                </div>
+            </div>
+          
+            <div class="control-group">
+                <label class="control-label" for="movie_summary">Summary</label>
+                <div class="controls">
+                <input class="text_field" id="movie_summary" name="movie[summary]" size="30" type="text" required="true">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label class="control-label" for="movie_img">Image</label>
+                <div class="controls">
+                <input id="movie_img" name="movie[img]" type="file" required="true">
+                </div>
+            </div>
+
+            <a class="btn btn-primary" id="submit-btn">Create Movie</a>
+            <a href="/" id="cancel" class="btn">Cancel</a>
+        </form>
+    </div>
+</script>
+
+
+
+<script type="text/template" id="update-movie-template">
+    <div class="container">
+        <h3>Edit</h3>
+        <div class="row">
+            <form class="span4" enctype="multipart/form-data" id="update_movie_form" name="movie" method="POST" >
+                <div class="control-group">
+                    <label class="control-label" for="movie_title">Title</label>
+                    <div class="controls">
+                    <input id="update_title" class="text_field" size=50 name="movie[title]" type="text" required="true" value={{= model.title }}>
+                    </div>
+                </div>
+            
+                <div class="control-group">
+                    <label class="control-label" for="movie_summary">Summary</label>
+                    <div class="controls">
+                    <input id="update_summary" class="text_field" size=500 name="movie[summary]" type="text" required="true" value={{= model.title}}>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label class="control-label" for="movie_img">Image</label>
+                    <div class="controls">
+                        <input name="movie[img]" type="file">
+                    </div>
+                </div>
+            
+                <a id="update-btn" class="btn btn-success">Update</a>
+                <a id="cancel-update-btn" class="btn btn-danger">Cancel</a>
+            </form>
+            <div class="span4">
+                <img src={{= model.img_url }} class="img-circle" id="single-movie-img"> 
+            </div>
+        </div>
+    </div>
+</script>
+
+
+<script type="text/template" id="single-movie-template">
+    <div class="single-movie">
+        <div class="container">
+            <div class="row">
+                <div class="span4">
+                    <img src={{= model.img_url }} class="img-circle" id="single-movie-img"> 
+                </div>
+                <div class="span6">
+                    <h1>{{= model.title }}</h1>
+                    <p>{{= model.summary }}</p>
+                    <button id="update_movie_btn" class="btn btn-success" >Update</button>
+                    <button id="delete-movie-btn" type="button" class="btn btn-danger" >Delete</button>
+                </div>  
+            </div>
+          
+            {{ _.each(model.reviews.toJSON(), function(review) { }}
+            <div class="well comment">
+                <div class="row-fluid">
+                    <p class="span12">
+                           
+                    <b>{{= review.user.username }}</b>
+
+                        <span class="label label-success pull-right">
+                            <icon class="icon-ok">
+                            </icon>{{= review.score }} points
+
+                        </span>
+                        </br>
+                        </br>
+
+                        <span class="icon-remove label label-success pull-right"
+                            <icon review_id={{= review.id }} movie_id={{= review.movie_id }}>
+                            </icon>Remove
+                        </span>
+                    </p>
+                </div>
+
+                <div class="row-fluid">
+                    <p class="span12">{{= review.comment}}</p>
+                </div>
+            </div>
+            {{ }); }}
+
+            <div class="well">
+                <div class="row-fluid">
+                    <label class="span3" for="review_score">Score (1-100)</label>
+                    <input class="span3" id="review_score" name="review[score]" type="number">
+                </div>
+                <div class="row-fluid">
+                    <label class="span3" for="review_comment">Comment</label>
+                    <textarea class="span9" cols="40" id="review_comment" name="review[comment]" rows="3"></textarea>
+                </div>
+                <input name="commit" id="submit" type="submit" value="Create Review">
+            </div>
+        </div>
+    </div>
+</script>
+

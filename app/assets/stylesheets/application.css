@@ -1,0 +1,66 @@
+/*
+ * This is a manifest file that'll be compiled into application.css, which will include all the files
+ * listed below.
+ *
+ * Any CSS and SCSS file within this directory, lib/assets/stylesheets, vendor/assets/stylesheets,
+ * or vendor/assets/stylesheets of plugins, if any, can be referenced here using a relative path.
+ *
+ * You're free to add application-wide styles to this file and they'll appear at the top of the
+ * compiled file, but it's generally better to create a new file per style scope.
+ *
+ *= require_self
+ *= require_tree .
+ */
+.movie-title {
+    font-size: 1.2em !important;
+    -o-text-overflow: ellipsis;
+    text-overflow: ellipsis;
+    overflow:hidden;
+    white-space:nowrap;
+    width: 70%;
+}
+
+div.movie-view {
+    max-width: 270px;
+    float: left;
+    padding-left: 10px;
+}
+
+div.row-movies {  
+    float: left;
+    padding-left: 10px;
+}
+
+#app ul.movies li {
+    position: relative;
+    padding: 0.5em;
+    font-size: 25px;
+    colour: black;
+    border-bottom: 1px solid #ccc; 
+}
+
+#app ul.movies img {
+    height: 30px;
+    float: right;
+    position: absolute;
+    right: 10px; 
+}
+
+#content {
+	margin-top: 40px;
+}
+
+.well {
+	margin-top: 80px;
+}
+
+#pagination {
+    margin-top: 80px;
+    margin-left: 40px;
+}
+
+#pagination a {
+    font-size: 1.4em
+}
+
+
