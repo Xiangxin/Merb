@@ -1,4 +1,4 @@
-var movies = new Movies( );
+var movies = new Movies();
 
 var AppView = Merb.View.extend({
 	//el: set element of main div changing

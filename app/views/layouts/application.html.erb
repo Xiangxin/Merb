@@ -143,6 +143,33 @@
 </script>
 
 
+<script type="text/template" id="movie-review-template">
+    <div class="well comment">
+        <div class="row-fluid">
+            <p class="span12">
+                   
+            <b>{{= model.user.username }}</b>
+                <span class="label label-success pull-right">
+                    <icon class="icon-ok">
+                    </icon>{{= model.score }} points
+                </span>
+                </br>
+                </br>
+
+                <span class="icon-remove label label-success pull-right"
+                    <icon review_id={{= model.id }} movie_id={{= model.movie_id }}>
+                    </icon>Remove
+                </span>
+            </p>
+        </div>
+
+        <div class="row-fluid">
+            <p class="span12">{{= model.comment}}</p>
+        </div>
+    </div>
+</script>
+
+
 <script type="text/template" id="single-movie-template">
     <div class="single-movie">
         <div class="container">
@@ -157,34 +184,8 @@
                     <button id="delete-movie-btn" type="button" class="btn btn-danger" >Delete</button>
                 </div>  
             </div>
-          
-            {{ _.each(model.reviews.toJSON(), function(review) { }}
-            <div class="well comment">
-                <div class="row-fluid">
-                    <p class="span12">
-                           
-                    <b>{{= review.user.username }}</b>
 
-                        <span class="label label-success pull-right">
-                            <icon class="icon-ok">
-                            </icon>{{= review.score }} points
-
-                        </span>
-                        </br>
-                        </br>
-
-                        <span class="icon-remove label label-success pull-right"
-                            <icon review_id={{= review.id }} movie_id={{= review.movie_id }}>
-                            </icon>Remove
-                        </span>
-                    </p>
-                </div>
-
-                <div class="row-fluid">
-                    <p class="span12">{{= review.comment}}</p>
-                </div>
-            </div>
-            {{ }); }}
+            <ul id="review-list"></ul>
 
             <div class="well">
                 <div class="row-fluid">
