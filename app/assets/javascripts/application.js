@@ -16,6 +16,7 @@
 //= require turbolinks
 //= require underscore
 //= require merb
+//= require helper
 //= require movie_review
 //= require_tree ../templates
 //= require_tree ./models

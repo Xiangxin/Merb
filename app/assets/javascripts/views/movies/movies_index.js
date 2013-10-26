@@ -1,29 +1,4 @@
 
-// Helper functions
-_.templateSettings = {
-	interpolate: /\{\{=(.+?)\}\}/g,
-	escape: /\{\{-(.+?)\}\}/g,
-	evaluate: /\{\{(.+?)\}\}/g,
-};
-
- 
-function getCookie(name) {
-    var cookieValue = null;
-    if (document.cookie && document.cookie != '') {
-        var cookies = document.cookie.split(';');
-        for (var i = 0; i < cookies.length; i++) {
-            var cookie = jQuery.trim(cookies[i]);
-            // Does this cookie string begin with the name we want?
-            if (cookie.substring(0, name.length + 1) == (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }	
-    }
-    return cookieValue;
-}
-
-
 //Movie Listing View
 var MoviesView = Merb.View.extend({
 	el : ".row-movies", //the DOM Element class 'movies'
@@ -43,15 +18,11 @@ var MoviesView = Merb.View.extend({
 
 //Single Line Movie View in List
 var MovieView = Merb.View.extend({
-	tagName: "div", //insert into <ul> tag
-	//template: _.template($("#movie-template").html()),
-	//el: "div",
+	tagName: "div",
+
 	events : {
 		"click" : "showMovie"
 	},
-	//initialize: function(){
-	//	this.render();
-	//}
 
 	showMovie : function(){
 		AppRouterInst.navigate('/movies/' + this.model.id, true);
@@ -84,21 +55,31 @@ var SingleMovieView = Merb.View.extend({
 	render: function () {
 		var template = _.template($("#single-movie-template").html(), {model: this.model.toJSON()});
 	 	this.$el.html(template);
-	 	var reviews_view = new ReviewsView();
+	 	var reviews_view = new ReviewsView({collection:this.model.reviews});
 		reviews_view.render(this.model.reviews);
 		this.reviews_view = reviews_view;
-		// reviews_view.listenTo(this.model.reviews, 'add', reviews_view.addOne);
+		if (!userLoggedIn()) {
+			$("#update_movie_btn").hide();
+			$("#delete-movie-btn").hide();
+			$("#create-review").hide();
+		}
+
+		$(".single-movie").focus();
 		return this;
 	},
 
 	update_movie: function() {
+		if(!userLoggedIn) {
+			alert("Sorry but please log in first!");
+			return;
+		}
 		window.location.href = "/#edit/" + this.model.id;
 	},
 
 	delete_movie: function () {
 		var token = getCookie('token');
 		if (token == "" || token == null) {
-			alert("Sadly you cannot delete it before you sign in.");
+			alert("Sorry but please log in first!");
 			return;
 		}
 
@@ -152,16 +133,14 @@ var SingleMovieView = Merb.View.extend({
 	        headers: {'Content-Type':'application/json'},
 	        data: JSON.stringify(data),
 	        success: function(result) {
-	        	$("#submit").text("Create").removeAttr("disabled"); 
-	        	//self.model.reviews.add(data);
-	            // AppRouterInst.navigate("/#movies/" + movie_id, true);
+	        	$("#submit").text("Create").removeAttr("disabled");
 	            console.log(result);
 	            data.user = result.user;
 	            data.id = result.id;
-	            self.model.reviews.add(data);
+	            self.model.reviews.push(data);
     			self.reviews_view.addOne(new Review(data));
-    			$("#review_score").value = "";
-    			$("#review_comment").value = "";
+    			$("#review_score").val('');
+    			$("#review_comment").val('');
 	        },
 	        error: function (xhr, status, err) {
 	        	$("#submit").text("Create Review").removeAttr("disabled"); 
@@ -172,16 +151,15 @@ var SingleMovieView = Merb.View.extend({
 });
 
 
+
 var UpdateMovieView = Merb.View.extend({
 	render: function(){
 
 		var template = _.template($("#update-movie-template").html(), {model: this.model.attributes});
 		$('.testa').html(template);
 
-		var token = getCookie('token');
-		console.log(token);
-		if (token == "" || token == null) {
-			alert("Sadly you cannot before you sign in.");
+		if (userLoggedIn()) {
+			alert("Sorry but please log in first!");
 			return;
 		}
  		$('#update_title').val(this.model.attributes.title);
@@ -190,20 +168,18 @@ var UpdateMovieView = Merb.View.extend({
 
         $('#cancel-update-btn').click(function(){
             window.location.href = "/#movies/" + id;
-
         });
 
  		$("#update-btn").click(function(){
 
 			var summary, title, img; 
-			title = $('#update_title').val();
-			summary = $('#update_summary').val();
+			title = $.trim($('#update_title').val());
+			summary = $.trim($('#update_summary').val());
 			img = $("update_image").val();
 
 			if (title == "" || summary == "") {
 		           alert("Please provide complete data!");
 		    } else {
-
 		    	   $("#update-btn").text("Updating...").attr('disabled', 'disabled');
 		           var formData = new FormData();
 
@@ -223,8 +199,8 @@ var UpdateMovieView = Merb.View.extend({
 		            	cache: false,
 		            	contentType: false,
 		            	processData: false,
-		            	error: function(jqXHR, textStatus, error) {
-                    	 	console.log(textStatus + ": " + error);
+		            	error: function(xhr, textStatus, error) {
+                    	 	console.log(xhr);
                     	 	if (error == 'Unauthorized') {
                     	 		alert('This is not your movie!');	                  
                     	 	}
@@ -256,8 +232,8 @@ var CreateMovieView = Merb.View.extend({
 			console.log(token);
 
 			var summary, title, img; 
-			title = $('#movie_title').val();
-			summary = $('#movie_summary').val();
+			title = $.trim($('#movie_title').val());
+			summary = $.trim($('#movie_summary').val());
 			img = $('#movie_img').val();
 
 			

@@ -67,7 +67,7 @@
     <h3 class='movie-title'>
         {{=model.title}}
     </h3>
-    <img alt='A' src={{= model.img_url }} class="img-circle">
+    <img style="cursor:pointer" alt='A' src={{= model.img_url }} class="img-circle">
 </script>
 
 
@@ -153,7 +153,7 @@
                 </span>
                 </br></br>
 
-                <span class="icon-remove label label-success pull-right"
+                <span style="cursor:pointer" class="icon-remove label label-success pull-right"
                     <icon review_id={{= model.id }} movie_id={{= model.movie_id }}>
                     </icon>Remove
                 </span>
@@ -184,7 +184,7 @@
 
             <ul id="review-list"></ul>
 
-            <div class="well">
+            <div id="create-review" class="well">
                 <div class="row-fluid">
                     <label class="span3" for="review_score">Score (1-100)</label>
                     <input id="review_score" class="span3" id="review_score" name="review[score]" type="number">
