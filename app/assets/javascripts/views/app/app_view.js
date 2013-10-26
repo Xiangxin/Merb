@@ -41,7 +41,7 @@ var AppView = Merb.View.extend({
 	showSingleMovieView: function(movie_id){
         $('#pagination').hide();
         var movie = new Movie({id: movie_id});
-        movie.url = "http://cs3213.herokuapp.com/movies/"+movie_id+".json"
+        movie.url = "http://cs3213.herokuapp.com/movies/" + movie_id + ".json"
 
         movie.fetch({
             success : function(thisMovie){
@@ -49,7 +49,7 @@ var AppView = Merb.View.extend({
                     success: function(thisMovieReviews) {
                         thisMovie.set("reviews", thisMovieReviews);
                         var view = new SingleMovieView({model: movie});
-                        view.render(movie.id);
+                        view.render();
                         return this;
                     }
                 });

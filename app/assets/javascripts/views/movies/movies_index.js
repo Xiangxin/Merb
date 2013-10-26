@@ -78,20 +78,16 @@ var SingleMovieView = Merb.View.extend({
 	events : {
 		"click #update_movie_btn": "update_movie",
 		"click #delete-movie-btn": "delete_movie",
+		"click #submit": "create_review",
 	},
 
-	// initialize: function () {
-	// 	this.listenTo(this.model, 'change', this.render);
-	// 	this.listenTo(this.model, 'destroy', this.remove);
-	// },
-
-	render: function (movie_id) {
+	render: function () {
 		var template = _.template($("#single-movie-template").html(), {model: this.model.toJSON()});
 	 	this.$el.html(template);
-	 	var reviews_view = new ReviewsView({ })
-		_.each(this.model.reviews.models, function(review) {
-			reviews_view.addOne(review);
-		});
+	 	var reviews_view = new ReviewsView();
+		reviews_view.render(this.model.reviews);
+		this.reviews_view = reviews_view;
+		// reviews_view.listenTo(this.model.reviews, 'add', reviews_view.addOne);
 		return this;
 	},
 
@@ -101,7 +97,6 @@ var SingleMovieView = Merb.View.extend({
 
 	delete_movie: function () {
 		var token = getCookie('token');
-		console.log(token);
 		if (token == "" || token == null) {
 			alert("Sadly you cannot delete it before you sign in.");
 			return;
@@ -127,6 +122,52 @@ var SingleMovieView = Merb.View.extend({
         	    window.location.href = "/";
         	}
      	}); 
+	},
+
+	create_review: function(){
+ 		var token = getCookie("token");
+ 		var score = $.trim($("#review_score").val());
+ 		var comment = $.trim($("#review_comment").val());
+ 		if(score < 1 || score > 100) {
+			alert("Please enter a score between 1 and 100");
+    		return;
+		}
+
+		var movie_id = this.model.id;
+
+		var data = {
+	      	'movie_id': movie_id,
+	      	'score': score,
+	      	'comment': comment,
+	      	'access_token': token,
+    	};
+
+    	var self = this;
+    	$("#submit").text("Creating...").attr('disabled', 'disabled');
+	    var url = "http://cs3213.herokuapp.com/movies/" + movie_id + "/reviews.json";
+	    $.ajax({
+	        url: url,
+	        type: "POST",
+	        dataType: "json",
+	        headers: {'Content-Type':'application/json'},
+	        data: JSON.stringify(data),
+	        success: function(result) {
+	        	$("#submit").text("Create").removeAttr("disabled"); 
+	        	//self.model.reviews.add(data);
+	            // AppRouterInst.navigate("/#movies/" + movie_id, true);
+	            console.log(result);
+	            data.user = result.user;
+	            data.id = result.id;
+	            self.model.reviews.add(data);
+    			self.reviews_view.addOne(new Review(data));
+    			$("#review_score").value = "";
+    			$("#review_comment").value = "";
+	        },
+	        error: function (xhr, status, err) {
+	        	$("#submit").text("Create Review").removeAttr("disabled"); 
+	            console.log(xhr);
+	       	 }
+	    });
 	},
 });
 

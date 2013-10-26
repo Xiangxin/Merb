@@ -23,12 +23,12 @@
 div.movie-view {
     max-width: 270px;
     float: left;
-    padding-left: 10px;
+    /*padding-left: 10px;*/
 }
 
-div.row-movies {  
+div.row-movies {
     float: left;
-    padding-left: 10px;
+  /*  padding-left: 10px;*/
 }
 
 #app ul.movies li {
@@ -36,7 +36,13 @@ div.row-movies {
     padding: 0.5em;
     font-size: 25px;
     colour: black;
-    border-bottom: 1px solid #ccc; 
+    border-bottom: 1px solid #ccc;
+}
+
+#review-list {
+    margin-top: 30px;
+    margin-bottom: 30px;
+    list-style-type: none;
 }
 
 #app ul.movies img {
@@ -48,10 +54,6 @@ div.row-movies {
 
 #content {
 	margin-top: 40px;
-}
-
-.well {
-	margin-top: 80px;
 }
 
 #pagination {

@@ -5,7 +5,7 @@ var Movie = Merb.Model.extend({
 	},
 	
 	initialize: function() {
-	    this.reviews = new ReviewList();
+	    this.reviews = new Reviews();
 		this.reviews.url = "http://cs3213.herokuapp.com/movies/" + this.attributes.id + "/reviews.json";
 	}
 });
