@@ -534,6 +534,20 @@
       return this.sync('read', this, options);
     },
 
+    create: function(model, options) {
+      options = options ? _.clone(options) : {};
+      if (!(model = this._prepareModel(model, options))) return false;
+      if (!options.wait) this.add(model, options);
+      var collection = this;
+      var success = options.success;
+      options.success = function(resp) {
+        if (options.wait) collection.add(model, options);
+        if (success) success(model, resp, options);
+      };
+      model.save(null, options);
+      return model;
+    },
+
     // **parse** converts a response into a list of models to be added to the
     // collection. The default implementation is just to pass it through.
     parse: function(resp, options) {
@@ -652,7 +666,7 @@
     // applicable Merb.Events listeners.
     remove: function() {
       this.$el.remove();
-      this.stopListening();
+      // this.stopListening();
       return this;
     },
 

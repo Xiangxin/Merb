@@ -18,15 +18,15 @@ var ReviewView = Merb.View.extend({
 	 	var url = "http://cs3213.herokuapp.com/movies/" + movie_id + "/reviews/" + review_id + ".json";
 	 	var coll = this.model.collection;
 	 	var mdl = this.model;
+	 	var self = this;
 
 	    $.ajax({
 		    type: "delete",
         	url: url,
         	data: {'access_token': token},
 		    success: function(result) {
+		    	self.remove();
 		    	coll.remove(mdl);
-		    	var reviews_view = new ReviewsView();
-				reviews_view.render(coll);
         	},
         	error: function (xhr, status, err) {
         		console.log(xhr);

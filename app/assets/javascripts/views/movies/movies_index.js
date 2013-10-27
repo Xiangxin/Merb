@@ -137,8 +137,10 @@ var SingleMovieView = Merb.View.extend({
 	            console.log(result);
 	            data.user = result.user;
 	            data.id = result.id;
-	            self.model.reviews.push(data);
-    			self.reviews_view.addOne(new Review(data));
+	            var newReview = new Review(data);
+	            newReview.collection = self.model.reviews;
+	            self.model.reviews.push(newReview);
+    			self.reviews_view.addOne(newReview);
     			$("#review_score").val('');
     			$("#review_comment").val('');
 	        },
