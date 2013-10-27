@@ -18,7 +18,6 @@
 //= require merb
 //= require helper
 //= require movie_review
-//= require_tree ../templates
 //= require_tree ./models
 //= require_tree ./collections
 //= require_tree ./views
