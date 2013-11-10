@@ -1,8 +1,11 @@
 (function(){
 
   var Merb = this.Merb = {};
-
   
+  ////////////////
+  // Merb Event //
+  ////////////////
+
   var Events = Merb.Events = {
 
     // Bind an event to a `callback` function. Passing `"all"` will bind
@@ -93,12 +96,6 @@
 
   };
 
-  // Regular expression used to split event strings.
-  var eventSplitter = /\s+/;
-
-  // Implement fancy features of the Events API such as multiple event
-  // names `"change blur"` and jQuery-style event maps `{change: action}`
-  // in terms of the existing API.
   var eventsApi = function(obj, action, name, rest) {
     if (!name) return true;
 
@@ -109,16 +106,6 @@
       }
       return false;
     }
-
-    // Handle space separated event names.
-    if (eventSplitter.test(name)) {
-      var names = name.split(eventSplitter);
-      for (var i = 0, l = names.length; i < l; i++) {
-        obj[action].apply(obj, [names[i]].concat(rest));
-      }
-      return false;
-    }
-
     return true;
   };
 
@@ -152,14 +139,6 @@
     };
   });
 
-  // Aliases for backwards compatibility.
-  Events.bind   = Events.on;
-  Events.unbind = Events.off;
-
-  // Allow the `Merb` object to serve as a global event bus, for folks who
-  // want global "pubsub" in a convenient place.
-  _.extend(Merb, Events);
-
   
   ////////////////
   // Merb Model //
@@ -172,9 +151,6 @@
     this.attributes = {};
     if (options.collection) this.collection = options.collection;
     if (options.parse) attrs = this.parse(attrs, options) || {};
-    if (defaults = _.result(this, 'defaults')) {
-      attrs = _.defaults({}, attrs, defaults);
-    }
     this.set(attrs, options);
     this.changed = {};
     this.initialize.apply(this, arguments);
@@ -182,8 +158,6 @@
 
   // Attach all inheritable methods to the Model prototype.
   _.extend(Model.prototype, Events, {
-
-    idAttribute: 'id',
 
     initialize: function(){},
 
@@ -225,8 +199,7 @@
       }
       current = this.attributes, prev = this._previousAttributes;
 
-      // Check for changes of `id`.
-      if (this.idAttribute in attrs) this.id = attrs[this.idAttribute];
+      if ("id" in attrs) this.id = attrs["id"];
 
       // For each `set` attribute, update or delete the current value.
       for (attr in attrs) {
@@ -268,11 +241,11 @@
       var model = this;
       var success = options.success;
       options.success = function(resp) {
-        if (!model.set(model.parse(resp, options), options)) return false;
+        if (!model.set(resp, options))
+          return false;
         if (success) success(model, resp, options);
-        model.trigger('sync', model, resp, options);
+          model.trigger('sync', model, resp, options);
       };
-      wrapError(this, options);
       return this.sync('read', this, options);
     },
 
@@ -319,7 +292,7 @@
         if (success) success(model, resp, options);
         model.trigger('sync', model, resp, options);
       };
-      wrapError(this, options);
+      // wrapError(this, options);
 
       method = this.isNew() ? 'create' : (options.patch ? 'patch' : 'update');
       if (method === 'patch') options.attrs = attrs;
@@ -353,7 +326,7 @@
         options.success();
         return false;
       }
-      wrapError(this, options);
+      // wrapError(this, options);
 
       var xhr = this.sync('delete', this, options);
       if (!options.wait) destroy();
@@ -392,294 +365,215 @@
   // Define the Collection's inheritable methods.
   _.extend(Collection.prototype, Events, {
 
-    model: Model,
+        model: Model,
 
-    _reset: function() {
-      this.length = 0;
-      this.models = [];
-      this._byId  = {};
-    },
+        _reset: function() {
+          if(this.models) {
+            for (var i = 0, l = this.models.length; i < l; i++) {
+              this._removeReference(this.models[i]);
+            }  
+          }
+          this.length = 0;
+          this.models = [];
+          this._byId  = {};
+        },
 
-    // add a model to collection
-    add: function(model) {
-      var existing_model = this.get(model);
-      if(existing_model) return;
+        // add a model to collection
+        add: function(model) {
+          var existing_model = this.get(model);
+          if(existing_model) return;
 
-      options = {add: true, merge: false, remove: false};
-      var model = this._prepareModel(model, options);
-      model.on('all', this._onModelEvent, this);
-      this._byId[model.cid] = model;
-      if (model.id != null) this._byId[model.id] = model;
-      this.length += 1;
-      this.models.push(model);
-      model.trigger('add', model, this, options);
-      return this;
-    },
+          options = {add: true, merge: false, remove: false};
+          var model = this._prepareModel(model, options);
+          model.on('all', this._onModelEvent, this);
+          this._byId[model.cid] = model;
+          if (model.id != null) this._byId[model.id] = model;
+          this.length += 1;
+          this.models.push(model);
+          model.trigger('add', model, this, options);
+          return this;
+        },
 
-    // remove a model from collection
-    remove: function(model) {      
-      var existing_model = this.get(model);
-      if (existing_model) {
-        delete this._byId[existing_model.id];
-        delete this._byId[existing_model.cid];
-        index = _.indexOf(this.models, existing_model);
-        this.models.splice(index, 1);
-        this.length--;
-        model.trigger('remove', existing_model, this, {'index':index});
-        this._removeReference(existing_model);
-      }
-      return this;
-    },
+        // remove a model from collection
+        remove: function(model) {      
+          var existing_model = this.get(model);
+          if (existing_model) {
+            delete this._byId[existing_model.id];
+            delete this._byId[existing_model.cid];
+            index = _.indexOf(this.models, existing_model);
+            this.models.splice(index, 1);
+            this.length--;
+            model.trigger('remove', existing_model, this, {'index':index});
+            this._removeReference(existing_model);
+          }
+          return this;
+        },
 
-    fetch: function(options) {
-      options = options ? _.clone(options) : {};
-      options.parse = true;
-      var success = options.success;
-      var collection = this;
-      options.success = function(resp) {
-        collection._reset();
-        for(var i = 0; i < resp.length; i++) {
-          collection['add'](resp[i]);
+        fetch: function(options) {
+          options = options ? _.clone(options) : {};
+          options.parse = true;
+          var success = options.success;
+          var collection = this;
+          options.success = function(resp) {
+            collection._reset();
+            for(var i = 0; i < resp.length; i++) {
+              collection['add'](resp[i]);
+            }
+            
+            if (success) 
+              success(collection);
+            
+            collection.trigger('sync', collection, resp, options);
+          };
+          return this.sync('read', this, options);
+        },
+
+        // The JSON representation of a Collection is an array of the
+        // models' attributes.
+        toJSON: function(options) {
+          return this.map(function(model){ return model.toJSON(options); });
+        },
+
+        // Proxy `Merb.sync` by default.
+        sync: function() {
+          return Merb.sync.apply(this, arguments);
+        },
+
+        get: function(obj) {
+          if (obj == null) return void 0;
+          return this._byId[obj.id != null ? obj.id : obj.cid || obj];
+        },
+
+        // Prepare a hash of attributes (or other model) to be added to this
+        // collection.
+        _prepareModel: function(attrs, options) {
+          if (attrs instanceof Model) {
+            if (!attrs.collection) attrs.collection = this;
+            return attrs;
+          }
+          options || (options = {});
+          options.collection = this;
+          var model = new this.model(attrs, options);
+          if (!model._validate(attrs, options)) {
+            this.trigger('invalid', this, attrs, options);
+            return false;
+          }
+          return model;
+        },
+
+        // Internal method to sever a model's ties to a collection.
+        _removeReference: function(model) {
+          if (this === model.collection) delete model.collection;
+          model.off('all', this._onModelEvent, this);
+        },
+
+        // Internal method called every time a model in the set fires an event.
+        // Sets need to update their indexes when models change ids. All other
+        // events simply proxy through. "add" and "remove" events that originate
+        // in other collections are ignored.
+        _onModelEvent: function(event, model, collection, options) {
+          if ((event === 'add' || event === 'remove') && collection !== this) return;
+          if (event === 'destroy') this.remove(model, options);
+          if (model && event === 'change:' + model.idAttribute) {
+            delete this._byId[model.previous(model.idAttribute)];
+            if (model.id != null) this._byId[model.id] = model;
+          }
+          this.trigger.apply(this, arguments);
         }
-        
-        if (success) 
-          success(collection);
-        
-        collection.trigger('sync', collection, resp, options);
-      };
-      return this.sync('read', this, options);
-    },
-
-    // The JSON representation of a Collection is an array of the
-    // models' attributes.
-    toJSON: function(options) {
-      return this.map(function(model){ return model.toJSON(options); });
-    },
-
-    // Proxy `Merb.sync` by default.
-    sync: function() {
-      return Merb.sync.apply(this, arguments);
-    },
-
-    // reset: function(models, options) {
-    //   options || (options = {});
-    //   for (var i = 0, l = this.models.length; i < l; i++) {
-    //     this._removeReference(this.models[i]);
-    //   }
-    //   options.previousModels = this.models;
-    //   this.add(models, _.extend({silent: true}, options));
-    //   if (!options.silent) this.trigger('reset', this, options);
-    //   return this;
-    // },
-
-    get: function(obj) {
-      if (obj == null) return void 0;
-      return this._byId[obj.id != null ? obj.id : obj.cid || obj];
-    },
-
-    // Prepare a hash of attributes (or other model) to be added to this
-    // collection.
-    _prepareModel: function(attrs, options) {
-      if (attrs instanceof Model) {
-        if (!attrs.collection) attrs.collection = this;
-        return attrs;
-      }
-      options || (options = {});
-      options.collection = this;
-      var model = new this.model(attrs, options);
-      if (!model._validate(attrs, options)) {
-        this.trigger('invalid', this, attrs, options);
-        return false;
-      }
-      return model;
-    },
-
-    // Internal method to sever a model's ties to a collection.
-    _removeReference: function(model) {
-      if (this === model.collection) delete model.collection;
-      model.off('all', this._onModelEvent, this);
-    },
-
-    // Internal method called every time a model in the set fires an event.
-    // Sets need to update their indexes when models change ids. All other
-    // events simply proxy through. "add" and "remove" events that originate
-    // in other collections are ignored.
-    _onModelEvent: function(event, model, collection, options) {
-      if ((event === 'add' || event === 'remove') && collection !== this) return;
-      if (event === 'destroy') this.remove(model, options);
-      if (model && event === 'change:' + model.idAttribute) {
-        delete this._byId[model.previous(model.idAttribute)];
-        if (model.id != null) this._byId[model.id] = model;
-      }
-      this.trigger.apply(this, arguments);
-    }
 });
-
 
 
   ///////////////
   // Merb View //
   ///////////////
 
-  var View = Merb.View = function(options) {
-    this.cid = _.uniqueId('view');
-    this._configure(options || {});
-    this._ensureElement();
-    // this.initialize.apply(this, arguments);
-    this.delegateEvents();
-  };
+    var View = Merb.View = function(options) {
+        this.cid = _.uniqueId('view');
+        this._configure(options || {});
+        this._initView();
+    };
 
-  // Cached regex to split keys for `delegate`.
-  var delegateEventSplitter = /^(\S+)\s*(.*)$/;
+    var delegateEventSplitter = /^(\S+)\s*(.*)$/;
 
-  // List of view options to be merged as properties.
-  var viewOptions = ['model', 'collection', 'el', 'id', 'attributes', 'className', 'tagName', 'events'];
+    var viewOptions = ['model', 'collection', 'el', 'tagName', 'events'];
 
-  // Set up all inheritable **Merb.View** properties and methods.
-  _.extend(View.prototype, Events, {
+    _.extend(View.prototype, Events, {
 
-    // The default `tagName` of a View's element is `"div"`.
-    tagName: 'div',
+        // DOM Events handling
+        $: function(selector) {
+            return this.$el.find(selector);
+        },
 
-    // DOM Events handling
-    $: function(selector) {
-      return this.$el.find(selector);
-    },
+        render: function() {
+          return this;
+        },
 
-    // Initialize is an empty function by default. Override it with your own
-    // initialization logic.
-    // initialize: function(){},
+        remove: function() {
+          this.$el.remove();
+          this.stopListening();
+          return this;
+        },
 
-    // **render** is the core function that your view should override, in order
-    // to populate its element (`this.el`), with the appropriate HTML. The
-    // convention is for **render** to always return `this`.
-    render: function() {
-      return this;
-    },
+        _initView: function() {
 
-    // Remove this view by taking the element out of the DOM, and removing any
-    // applicable Merb.Events listeners.
-    remove: function() {
-      this.$el.remove();
-      this.stopListening();
-      return this;
-    },
+            var element = this.el;
+            if (!element) {
+                var attrs = _.extend({}, _.result(this, 'attributes'));
+                var tagName = this.tagName;
+                if(!tagName) tagName = 'div';
+                element = $('<' + tagName + '>').attr(attrs);
+            }
 
-    // Change the view's element (`this.el` property), including event
-    // re-delegation.
-    setElement: function(element, delegate) {
-      if (this.$el) this.undelegateEvents();
-      this.$el = element instanceof $ ? element : $(element);
-      this.el = this.$el[0];
-      if (delegate !== false) this.delegateEvents();
-      return this;
-    },
+            if (this.$el) this.undelegateEvents();
+            this.$el = element instanceof $ ? element : $(element);
+            this.el = this.$el[0];
+            this.delegateEvents();
+            return this;
+        },
 
-    // Set callbacks, where `this.events` is a hash of
-    //
-    // *{"event selector": "callback"}*
-    //
-    //     {
-    //       'mousedown .title':  'edit',
-    //       'click .button':     'save'
-    //       'click .open':       function(e) { ... }
-    //     }
-    //
-    // pairs. Callbacks will be bound to the view, with `this` set properly.
-    // Uses event delegation for efficiency.
-    // Omitting the selector binds the event to `this.el`.
-    // This only works for delegate-able events: not `focus`, `blur`, and
-    // not `change`, `submit`, and `reset` in Internet Explorer.
-    delegateEvents: function(events) {
-      if (!(events || (events = _.result(this, 'events')))) return this;
-      this.undelegateEvents();
-      for (var key in events) {
-        var method = events[key];
-        if (!_.isFunction(method)) method = this[events[key]];
-        if (!method) continue;
+        delegateEvents: function(events) {
+          if (!(events || (events = _.result(this, 'events')))) return this;
+          this.undelegateEvents();
+          for (var key in events) {
+            var method = events[key];
+            if (!_.isFunction(method)) method = this[events[key]];
+            if (!method) continue;
 
-        var match = key.match(delegateEventSplitter);
-        var eventName = match[1], selector = match[2];
-        method = _.bind(method, this);
-        eventName += '.delegateEvents' + this.cid;
-        if (selector === '') {
-          this.$el.on(eventName, method);
-        } else {
-          this.$el.on(eventName, selector, method);
-        }
-      }
-      return this;
-    },
+            var match = key.match(delegateEventSplitter);
+            var eventName = match[1], selector = match[2];
+            method = _.bind(method, this);
+            eventName += '.delegateEvents' + this.cid;
+            if (selector === '') {
+              this.$el.on(eventName, method);
+            } else {
+              this.$el.on(eventName, selector, method);
+            }
+          }
+          return this;
+        },
 
-    // Clears all callbacks previously bound to the view with `delegateEvents`.
-    // You usually don't need to use this, but may wish to if you have multiple
-    // Merb views attached to the same DOM element.
-    undelegateEvents: function() {
-      this.$el.off('.delegateEvents' + this.cid);
-      return this;
-    },
+        undelegateEvents: function() {
+          this.$el.off('.delegateEvents' + this.cid);
+          return this;
+        },
 
-    // Performs the initial configuration of a View with a set of options.
-    // Keys with special meaning *(e.g. model, collection, id, className)* are
-    // attached directly to the view.  See `viewOptions` for an exhaustive
-    // list.
-    _configure: function(options) {
-      if (this.options) options = _.extend({}, _.result(this, 'options'), options);
-      _.extend(this, _.pick(options, viewOptions));
-      this.options = options;
-    },
+        _configure: function(options) {
+          if (this.options) options = _.extend({}, _.result(this, 'options'), options);
+          _.extend(this, _.pick(options, viewOptions));
+          this.options = options;
+        },
 
-    // Ensure that the View has a DOM element to render into.
-    // If `this.el` is a string, pass it through `$()`, take the first
-    // matching element, and re-assign it to `el`. Otherwise, create
-    // an element from the `id`, `className` and `tagName` properties.
-    _ensureElement: function() {
-      if (!this.el) {
-        var attrs = _.extend({}, _.result(this, 'attributes'));
-        if (this.id) attrs.id = _.result(this, 'id');
-        if (this.className) attrs['class'] = _.result(this, 'className');
-        var $el = $('<' + _.result(this, 'tagName') + '>').attr(attrs);
-        this.setElement($el, false);
-      } else {
-        this.setElement(_.result(this, 'el'), false);
-      }
-    }
+});
 
-  });
 
-  // Merb.sync
-  // -------------
 
-  // Override this function to change the manner in which Merb persists
-  // models to the server. You will be passed the type of request, and the
-  // model in question. By default, makes a RESTful Ajax request
-  // to the model's `url()`. Some possible customizations could be:
-  //
-  // * Use `setTimeout` to batch rapid-fire updates into a single request.
-  // * Send up the models as XML instead of JSON.
-  // * Persist models via WebSockets instead of Ajax.
-  //
-  // Turn on `Merb.emulateHTTP` in order to send `PUT` and `DELETE` requests
-  // as `POST`, with a `_method` parameter containing the true HTTP method,
-  // as well as all requests with the body as `application/x-www-form-urlencoded`
-  // instead of `application/json` with the model in a param named `model`.
-  // Useful when interfacing with server-side languages like **PHP** that make
-  // it difficult to read the body of `PUT` requests.
   Merb.sync = function(method, model, options) {
     var type = methodMap[method];
 
-    // Default options, unless specified.
-    // _.defaults(options || (options = {}), {
-    //   emulateHTTP: Merb.emulateHTTP,
-    //   emulateJSON: Merb.emulateJSON
-    // });
-
-    // Default JSON-request options.
     var params = {type: type, dataType: 'json'};
 
-    // Ensure that we have a URL.
     if (!options.url) {
-      params.url = _.result(model, 'url') || urlError();
+      throw new Error("Merb Doesn't know where to fetch. URL is missing.");
     }
 
     // Ensure that we have the appropriate request data.
@@ -687,12 +581,6 @@
       params.contentType = 'application/json';
       params.data = JSON.stringify(options.attrs || model.toJSON(options));
     }
-
-    // For older servers, emulate JSON by encoding the request into an HTML-form.
-    // if (options.emulateJSON) {
-    //   params.contentType = 'application/x-www-form-urlencoded';
-    //   params.data = params.data ? {model: params.data} : {};
-    // }
 
     // For older servers, emulate HTTP by mimicking the HTTP method with `_method`
     // And an `X-HTTP-Method-Override` header.
@@ -721,7 +609,7 @@
     }
 
     // Make the request, allowing the user to override any Ajax options.
-    var xhr = options.xhr = Merb.ajax(_.extend(params, options));
+    var xhr = options.xhr = $.ajax(_.extend(params, options));
     model.trigger('request', model, xhr, options);
     return xhr;
   };
@@ -737,376 +625,212 @@
     'read':   'GET'
   };
 
-  // Set the default implementation of `Merb.ajax` to proxy through to `$`.
-  // Override this if you'd like to use a different library.
-  Merb.ajax = function() {
-    return $.ajax.apply($, arguments);
-  };
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  // Merb.Router
-  // ---------------
+  ///////////////
+  //  Router   //
+  ///////////////
 
-  // Routers map faux-URLs to actions, and fire events when routes are
-  // matched. Creating a new one sets its `routes` hash, if not set statically.
-  var Router = Merb.Router = function(options) {
-    options || (options = {});
-    if (options.routes) this.routes = options.routes;
-    this._bindRoutes();
-    this.initialize.apply(this, arguments);
-  };
-
-  // Cached regular expressions for matching named param parts and splatted
-  // parts of route strings.
-  var optionalParam = /\((.*?)\)/g;
-  var namedParam    = /(\(\?)?:\w+/g;
-  var splatParam    = /\*\w+/g;
-  var escapeRegExp  = /[\-{}\[\]+?.,\\\^$|#\s]/g;
-
-  // Set up all inheritable **Merb.Router** properties and methods.
-  _.extend(Router.prototype, Events, {
-
-    // Initialize is an empty function by default. Override it with your own
-    // initialization logic.
-    initialize: function(){},
-
-    // Manually bind a single named route to a callback. For example:
-    //
-    //     this.route('search/:query/p:num', 'search', function(query, num) {
-    //       ...
-    //     });
-    //
-    route: function(route, name, callback) {
-      if (!_.isRegExp(route)) route = this._routeToRegExp(route);
-      if (_.isFunction(name)) {
-        callback = name;
-        name = '';
-      }
-      if (!callback) callback = this[name];
-      var router = this;
-      Merb.history.route(route, function(fragment) {
-        var args = router._extractParameters(route, fragment);
-        callback && callback.apply(router, args);
-        router.trigger.apply(router, ['route:' + name].concat(args));
-        router.trigger('route', name, args);
-        Merb.history.trigger('route', router, name, args);
-      });
-      return this;
-    },
-
-    // Simple proxy to `Merb.history` to save a fragment into the history.
-    navigate: function(fragment, options) {
-      Merb.history.navigate(fragment, options);
-      return this;
-    },
-
-    // Bind all defined routes to `Merb.history`. We have to reverse the
-    // order of the routes here to support behavior where the most general
-    // routes can be defined at the bottom of the route map.
-    _bindRoutes: function() {
-      if (!this.routes) return;
-      this.routes = _.result(this, 'routes');
-      var route, routes = _.keys(this.routes);
-      while ((route = routes.pop()) != null) {
-        this.route(route, this.routes[route]);
-      }
-    },
-
-    // Convert a route string into a regular expression, suitable for matching
-    // against the current location hash.
-    _routeToRegExp: function(route) {
-      route = route.replace(escapeRegExp, '\\$&')
-                   .replace(optionalParam, '(?:$1)?')
-                   .replace(namedParam, function(match, optional){
-                     return optional ? match : '([^\/]+)';
-                   })
-                   .replace(splatParam, '(.*?)');
-      return new RegExp('^' + route + '$');
-    },
-
-    // Given a route, and a URL fragment that it matches, return the array of
-    // extracted decoded parameters. Empty or unmatched parameters will be
-    // treated as `null` to normalize cross-browser behavior.
-    _extractParameters: function(route, fragment) {
-      var params = route.exec(fragment).slice(1);
-      return _.map(params, function(param) {
-        return param ? decodeURIComponent(param) : null;
-      });
-    }
-
-  });
-
-  // Merb.History
-  // ----------------
-
-  // Handles cross-browser history management, based on either
-  // [pushState](http://diveintohtml5.info/history.html) and real URLs, or
-  // [onhashchange](https://developer.mozilla.org/en-US/docs/DOM/window.onhashchange)
-  // and URL fragments. If the browser supports neither (old IE, natch),
-  // falls back to polling.
-  var History = Merb.History = function() {
-    this.handlers = [];
-    _.bindAll(this, 'checkUrl');
-
-    // Ensure that `History` can be used outside of the browser.
-    if (typeof window !== 'undefined') {
-      this.location = window.location;
-      this.history = window.history;
-    }
-  };
-
-  // Cached regex for stripping a leading hash/slash and trailing space.
-  var routeStripper = /^[#\/]|\s+$/g;
-
-  // Cached regex for stripping leading and trailing slashes.
-  var rootStripper = /^\/+|\/+$/g;
-
-  // Cached regex for detecting MSIE.
-  var isExplorer = /msie [\w.]+/;
-
-  // Cached regex for removing a trailing slash.
-  var trailingSlash = /\/$/;
-
-  // Has the history handling already been started?
-  History.started = false;
-
-  // Set up all inheritable **Merb.History** properties and methods.
-  _.extend(History.prototype, Events, {
-
-    // The default interval to poll for hash changes, if necessary, is
-    // twenty times a second.
-    interval: 50,
-
-    // Gets the true hash value. Cannot use location.hash directly due to bug
-    // in Firefox where location.hash will always be decoded.
-    getHash: function(window) {
-      var match = (window || this).location.href.match(/#(.*)$/);
-      return match ? match[1] : '';
-    },
-
-    // Get the cross-browser normalized URL fragment, either from the URL,
-    // the hash, or the override.
-    getFragment: function(fragment, forcePushState) {
-      if (fragment == null) {
-        if (this._hasPushState || !this._wantsHashChange || forcePushState) {
-          fragment = this.location.pathname;
-          var root = this.root.replace(trailingSlash, '');
-          if (!fragment.indexOf(root)) fragment = fragment.substr(root.length);
-        } else {
-          fragment = this.getHash();
-        }
-      }
-      return fragment.replace(routeStripper, '');
-    },
-
-    // Start the hash change handling, returning `true` if the current URL matches
-    // an existing route, and `false` otherwise.
-    start: function(options) {
-      if (History.started) throw new Error("Merb.history has already been started");
-      History.started = true;
-
-      // Figure out the initial configuration. Do we need an iframe?
-      // Is pushState desired ... is it available?
-      this.options          = _.extend({}, {root: '/'}, this.options, options);
-      this.root             = this.options.root;
-      this._wantsHashChange = this.options.hashChange !== false;
-      this._wantsPushState  = !!this.options.pushState;
-      this._hasPushState    = !!(this.options.pushState && this.history && this.history.pushState);
-      var fragment          = this.getFragment();
-      var docMode           = document.documentMode;
-      var oldIE             = (isExplorer.exec(navigator.userAgent.toLowerCase()) && (!docMode || docMode <= 7));
-
-      // Normalize root to always include a leading and trailing slash.
-      this.root = ('/' + this.root + '/').replace(rootStripper, '/');
-
-      if (oldIE && this._wantsHashChange) {
-        this.iframe = $('<iframe src="javascript:0" tabindex="-1" />').hide().appendTo('body')[0].contentWindow;
-        this.navigate(fragment);
-      }
-
-      // Depending on whether we're using pushState or hashes, and whether
-      // 'onhashchange' is supported, determine how we check the URL state.
-      if (this._hasPushState) {
-        $(window).on('popstate', this.checkUrl);
-      } else if (this._wantsHashChange && ('onhashchange' in window) && !oldIE) {
-        $(window).on('hashchange', this.checkUrl);
-      } else if (this._wantsHashChange) {
-        this._checkUrlInterval = setInterval(this.checkUrl, this.interval);
-      }
-
-      // Determine if we need to change the base url, for a pushState link
-      // opened by a non-pushState browser.
-      this.fragment = fragment;
-      var loc = this.location;
-      var atRoot = loc.pathname.replace(/[^\/]$/, '$&/') === this.root;
-
-      // If we've started off with a route from a `pushState`-enabled browser,
-      // but we're currently in a browser that doesn't support it...
-      if (this._wantsHashChange && this._wantsPushState && !this._hasPushState && !atRoot) {
-        this.fragment = this.getFragment(null, true);
-        this.location.replace(this.root + this.location.search + '#' + this.fragment);
-        // Return immediately as browser will do redirect to new url
-        return true;
-
-      // Or if we've started out with a hash-based route, but we're currently
-      // in a browser where it could be `pushState`-based instead...
-      } else if (this._wantsPushState && this._hasPushState && atRoot && loc.hash) {
-        this.fragment = this.getHash().replace(routeStripper, '');
-        this.history.replaceState({}, document.title, this.root + this.fragment + loc.search);
-      }
-
-      if (!this.options.silent) return this.loadUrl();
-    },
-
-    // Disable Merb.history, perhaps temporarily. Not useful in a real app,
-    // but possibly useful for unit testing Routers.
-    stop: function() {
-      $(window).off('popstate', this.checkUrl).off('hashchange', this.checkUrl);
-      clearInterval(this._checkUrlInterval);
-      History.started = false;
-    },
-
-    // Add a route to be tested when the fragment changes. Routes added later
-    // may override previous routes.
-    route: function(route, callback) {
-      this.handlers.unshift({route: route, callback: callback});
-    },
-
-    // Checks the current URL to see if it has changed, and if it has,
-    // calls `loadUrl`, normalizing across the hidden iframe.
-    checkUrl: function(e) {
-      var current = this.getFragment();
-      if (current === this.fragment && this.iframe) {
-        current = this.getFragment(this.getHash(this.iframe));
-      }
-      if (current === this.fragment) return false;
-      if (this.iframe) this.navigate(current);
-      this.loadUrl() || this.loadUrl(this.getHash());
-    },
-
-    // Attempt to load the current URL fragment. If a route succeeds with a
-    // match, returns `true`. If no defined routes matches the fragment,
-    // returns `false`.
-    loadUrl: function(fragmentOverride) {
-      var fragment = this.fragment = this.getFragment(fragmentOverride);
-      var matched = _.any(this.handlers, function(handler) {
-        if (handler.route.test(fragment)) {
-          handler.callback(fragment);
-          return true;
-        }
-      });
-      return matched;
-    },
-
-    // Save a fragment into the hash history, or replace the URL state if the
-    // 'replace' option is passed. You are responsible for properly URL-encoding
-    // the fragment in advance.
-    //
-    // The options object can contain `trigger: true` if you wish to have the
-    // route callback be fired (not usually desirable), or `replace: true`, if
-    // you wish to modify the current URL without adding an entry to the history.
-    navigate: function(fragment, options) {
-      if (!History.started) return false;
-      if (!options || options === true) options = {trigger: options};
-      fragment = this.getFragment(fragment || '');
-      if (this.fragment === fragment) return;
-      this.fragment = fragment;
-      var url = this.root + fragment;
-
-      // If pushState is available, we use it to set the fragment as a real URL.
-      if (this._hasPushState) {
-        this.history[options.replace ? 'replaceState' : 'pushState']({}, document.title, url);
-
-      // If hash changes haven't been explicitly disabled, update the hash
-      // fragment to store history.
-      } else if (this._wantsHashChange) {
-        this._updateHash(this.location, fragment, options.replace);
-        if (this.iframe && (fragment !== this.getFragment(this.getHash(this.iframe)))) {
-          // Opening and closing the iframe tricks IE7 and earlier to push a
-          // history entry on hash-tag change.  When replace is true, we don't
-          // want this.
-          if(!options.replace) this.iframe.document.open().close();
-          this._updateHash(this.iframe.location, fragment, options.replace);
-        }
-
-      // If you've told us that you explicitly don't want fallback hashchange-
-      // based history, then `navigate` becomes a page refresh.
-      } else {
-        return this.location.assign(url);
-      }
-      if (options.trigger) this.loadUrl(fragment);
-    },
-
-    // Update the hash location, either replacing the current entry, or adding
-    // a new one to the browser history.
-    _updateHash: function(location, fragment, replace) {
-      if (replace) {
-        var href = location.href.replace(/(javascript:|#).*$/, '');
-        location.replace(href + '#' + fragment);
-      } else {
-        // Some browsers require that `hash` contains a leading #.
-        location.hash = '#' + fragment;
-      }
-    }
-
-  });
-
-  // Create the default Merb.history.
-  Merb.history = new History;
-
-  // Helpers
-  // -------
-
-  // Helper function to correctly set up the prototype chain, for subclasses.
-  // Similar to `goog.inherits`, but uses a hash of prototype properties and
-  // class properties to be extended.
-  var extend = function(protoProps, staticProps) {
-    var parent = this;
-    var child;
-
-    // The constructor function for the new subclass is either defined by you
-    // (the "constructor" property in your `extend` definition), or defaulted
-    // by us to simply call the parent's constructor.
-    if (protoProps && _.has(protoProps, 'constructor')) {
-      child = protoProps.constructor;
-    } else {
-      child = function(){ return parent.apply(this, arguments); };
-    }
-
-    // Add static properties to the constructor function, if supplied.
-    _.extend(child, parent, staticProps);
-
-    // Set the prototype chain to inherit from `parent`, without calling
-    // `parent`'s constructor function.
-    var Surrogate = function(){ this.constructor = child; };
-    Surrogate.prototype = parent.prototype;
-    child.prototype = new Surrogate;
-
-    // Add prototype properties (instance properties) to the subclass,
-    // if supplied.
-    if (protoProps) _.extend(child.prototype, protoProps);
-
-    // Set a convenience property in case the parent's prototype is needed
-    // later.
-    child.__super__ = parent.prototype;
-
-    return child;
-  };
-
-  // Set up inheritance for the model, collection, router, view and history.
-  Model.extend = Collection.extend = Router.extend = View.extend = History.extend = extend;
-
-  // Throw an error when a URL is needed, and none is supplied.
-  var urlError = function() {
-    throw new Error('A "url" property or function must be specified');
-  };
-
-  // Wrap an optional error callback with a fallback error event.
-  var wrapError = function (model, options) {
-    var error = options.error;
-    options.error = function(resp) {
-      if (error) error(model, resp, options);
-      model.trigger('error', model, resp, options);
+    var Router = Merb.Router = function(options) {
+        options || (options = {});
+        if (options.routes) this.routes = options.routes;
+        this._bindRoutes();
+        this.initialize.apply(this, arguments);
     };
-  };
+    var optionalParam = /\((.*?)\)/g;
+    var namedParam    = /(\(\?)?:\w+/g;
+    var splatParam    = /\*\w+/g;
+    var escapeRegExp  = /[\-{}\[\]+?.,\\\^$|#\s]/g;
+
+    _.extend(Router.prototype, Events, {
+
+        initialize: function(){},
+
+        route: function(route, name, callback) {
+            if (!_.isRegExp(route)) route = this._routeToRegExp(route);
+            if (_.isFunction(name)) {
+              callback = name;
+              name = '';
+            }
+            if (!callback) callback = this[name];
+            var router = this;
+            Merb.history.route(route, function(fragment) {
+              var args = router._extractParameters(route, fragment);
+              callback && callback.apply(router, args);
+              router.trigger.apply(router, ['route:' + name].concat(args));
+              router.trigger('route', name, args);
+              Merb.history.trigger('route', router, name, args);
+            });
+            return this;
+        },
+        navigate: function(fragment, options) {
+          Merb.history.navigate(fragment, options);
+          return this;
+        },
+        _bindRoutes: function() {
+          if (!this.routes) return;
+          this.routes = _.result(this, 'routes');
+          var route, routes = _.keys(this.routes);
+          while ((route = routes.pop()) != null) {
+            this.route(route, this.routes[route]);
+          }
+        },
+        _routeToRegExp: function(route) {
+          route = route.replace(escapeRegExp, '\\$&')
+                       .replace(optionalParam, '(?:$1)?')
+                       .replace(namedParam, function(match, optional){
+                         return optional ? match : '([^\/]+)';
+                       })
+                       .replace(splatParam, '(.*?)');
+          return new RegExp('^' + route + '$');
+        },
+        _extractParameters: function(route, fragment) {
+          var params = route.exec(fragment).slice(1);
+          return _.map(params, function(param) {
+            return param ? decodeURIComponent(param) : null;
+          });
+        }
+  });
+
+
+  ///////////////
+  //  History  //
+  ///////////////
+  
+    var History = Merb.History = function() {
+        this.handlers = [];
+        _.bindAll(this, 'checkUrl');
+        if (typeof window !== 'undefined') {
+          this.location = window.location;
+          this.history = window.history;
+        }
+    };
+    var routeStripper = /^[#\/]|\s+$/g, rootStripper = /^\/+|\/+$/g, isExplorer = /msie [\w.]+/, trailingSlash = /\/$/;
+    History.started = false;
+    _.extend(History.prototype, Events, {
+        interval: 50,
+        getHash: function(window) {
+            var match = (window || this).location.href.match(/#(.*)$/);
+            return match ? match[1] : '';
+        },
+        getFragment: function(fragment, forcePushState) {
+          if (fragment == null) {
+            if (this._hasPushState || !this._wantsHashChange || forcePushState) {
+              fragment = this.location.pathname;
+              var root = this.root.replace(trailingSlash, '');
+              if (!fragment.indexOf(root)) fragment = fragment.substr(root.length);
+            } else {
+              fragment = this.getHash();
+            }
+          }
+          return fragment.replace(routeStripper, '');
+        },
+        start: function(options) {
+          if (History.started) throw new Error("Merb.history has already been started");
+          History.started = true;
+          this.options          = _.extend({}, {root: '/'}, this.options, options);
+          this.root             = this.options.root;
+          this._wantsHashChange = this.options.hashChange !== false;
+          this._wantsPushState  = !!this.options.pushState;
+          this._hasPushState    = !!(this.options.pushState && this.history && this.history.pushState);
+          var fragment          = this.getFragment();
+          var docMode           = document.documentMode;
+          var oldIE             = (isExplorer.exec(navigator.userAgent.toLowerCase()) && (!docMode || docMode <= 7));
+          this.root = ('/' + this.root + '/').replace(rootStripper, '/');
+          if (oldIE && this._wantsHashChange) {
+            this.iframe = $('<iframe src="javascript:0" tabindex="-1" />').hide().appendTo('body')[0].contentWindow;
+            this.navigate(fragment);
+          }
+          if (this._hasPushState) {
+            $(window).on('popstate', this.checkUrl);
+          } else if (this._wantsHashChange && ('onhashchange' in window) && !oldIE) {
+            $(window).on('hashchange', this.checkUrl);
+          } else if (this._wantsHashChange) {
+            this._checkUrlInterval = setInterval(this.checkUrl, this.interval);
+          }
+          this.fragment = fragment;
+          var loc = this.location;
+          var atRoot = loc.pathname.replace(/[^\/]$/, '$&/') === this.root;
+          if (this._wantsHashChange && this._wantsPushState && !this._hasPushState && !atRoot) {
+            this.fragment = this.getFragment(null, true);
+            this.location.replace(this.root + this.location.search + '#' + this.fragment);
+            return true;
+          } else if (this._wantsPushState && this._hasPushState && atRoot && loc.hash) {
+            this.fragment = this.getHash().replace(routeStripper, '');
+            this.history.replaceState({}, document.title, this.root + this.fragment + loc.search);
+          }
+
+            if (!this.options.silent) return this.loadUrl();
+        },
+        route: function(route, callback) {
+          this.handlers.unshift({route: route, callback: callback});
+        },
+        checkUrl: function(e) {
+          var current = this.getFragment();
+          if (current === this.fragment && this.iframe) {
+            current = this.getFragment(this.getHash(this.iframe));
+          }
+          if (current === this.fragment) return false;
+          if (this.iframe) this.navigate(current);
+          this.loadUrl() || this.loadUrl(this.getHash());
+        },
+        loadUrl: function(fragmentOverride) {
+          var fragment = this.fragment = this.getFragment(fragmentOverride);
+          var matched = _.any(this.handlers, function(handler) {
+            if (handler.route.test(fragment)) {
+              handler.callback(fragment);
+              return true;
+            }
+          });
+          return matched;
+        },
+        navigate: function(fragment, options) {
+          if (!History.started) return false;
+          if (!options || options === true) options = {trigger: options};
+          fragment = this.getFragment(fragment || '');
+          if (this.fragment === fragment) return;
+          this.fragment = fragment;
+          var url = this.root + fragment;
+
+          if (this._hasPushState) {
+            this.history[options.replace ? 'replaceState' : 'pushState']({}, document.title, url);
+
+          } else if (this._wantsHashChange) {
+            this._updateHash(this.location, fragment, options.replace);
+            if (this.iframe && (fragment !== this.getFragment(this.getHash(this.iframe)))) {
+              if(!options.replace) this.iframe.document.open().close();
+              this._updateHash(this.iframe.location, fragment, options.replace);
+            }
+          } else {
+            return this.location.assign(url);
+          }
+          if (options.trigger) this.loadUrl(fragment);
+        },
+        _updateHash: function(location, fragment, replace) {
+          if (replace) {
+            var href = location.href.replace(/(javascript:|#).*$/, '');
+            location.replace(href + '#' + fragment);
+          } else {
+            location.hash = '#' + fragment;
+          }
+          },
+    });
+    Merb.history = new History;
+  
+
+    var extend = function(protoProps) {
+        var parent = this;
+        var child = function(){ return parent.apply(this, arguments); };
+        _.extend(child, parent);
+        var Surrogate = function(){ this.constructor = child; };
+        Surrogate.prototype = parent.prototype;
+        child.prototype = new Surrogate;
+        if(protoProps)
+          _.extend(child.prototype, protoProps);
+        child.__super__ = parent.prototype;
+        return child;
+    };
+
+  Model.extend = Collection.extend = Router.extend = View.extend = History.extend = extend;
 
 }).call(this);

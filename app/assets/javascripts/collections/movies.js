@@ -1,6 +1,5 @@
 var Movies = Merb.Collection.extend({
 	model : Movie,
-	url : "http://cs3213.herokuapp.com/movies.json",
 
 	pagination : function(page) {
 		this.url = url + page.toString();

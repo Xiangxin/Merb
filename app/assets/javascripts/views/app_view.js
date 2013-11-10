@@ -11,6 +11,8 @@ var AppView = Merb.View.extend({
         movies.fetch({
             //using jquery param method to add param to url
             data: $.param({page: pageNum}),
+
+            url : "http://cs3213.herokuapp.com/movies.json",
               
             //upon success, run function
             success : function(data){
@@ -44,8 +46,13 @@ var AppView = Merb.View.extend({
         movie.url = "http://cs3213.herokuapp.com/movies/" + movie_id + ".json"
 
         movie.fetch({
+
+            url: "http://cs3213.herokuapp.com/movies/" + movie_id + ".json", 
+
             success : function(thisMovie){
                 thisMovie.reviews.fetch({
+
+                    url: "http://cs3213.herokuapp.com/movies/" + movie.id + "/reviews.json",
                     success: function(thisMovieReviews) {
                         thisMovie.set("reviews", thisMovieReviews);
                         var view = new SingleMovieView({model: movie});
@@ -69,8 +76,12 @@ var AppView = Merb.View.extend({
         movie.url = "http://cs3213.herokuapp.com/movies/"+movie_id+".json"
 
         movie.fetch({
+            url: movie.url,
+
             success : function(thisMovie){
                 thisMovie.reviews.fetch({
+                    url: "http://cs3213.herokuapp.com/movies/" + movie.id + "/reviews.json",
+
                     success: function(thisMovieReviews) {
                         thisMovie.set("reviews", thisMovieReviews);
                         var view = new UpdateMovieView({model: movie});
