@@ -15,7 +15,7 @@
 //= require twitter/bootstrap
 //= require turbolinks
 //= require underscore
-//= require merb
+//= require merb1
 //= require helper
 //= require movie_review
 //= require_tree ./models

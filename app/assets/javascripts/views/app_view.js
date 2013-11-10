@@ -14,7 +14,7 @@ var AppView = Merb.View.extend({
               
             //upon success, run function
             success : function(data){
-                movies.reset(data.models)
+                // movies.reset(data.models)
                 movies_view = new MoviesView({ }) //create collection view
                 _.each(movies.models, function(model){ //for each movie model in the collection, pass in that model
                       movies_view.addOne(model); //execute addOne method

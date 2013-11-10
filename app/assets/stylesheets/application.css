@@ -69,3 +69,8 @@ div.row-movies {
     margin-top: 40px;
 }
 
+#preview {
+    height: 300px;
+    width: 300px;
+}
+

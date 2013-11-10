@@ -29,3 +29,15 @@ function userLoggedIn() {
     }
     return true;
 }
+
+function changePreview(ev, el) {
+    var input = ev.target;
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+
+            reader.onload = function (e) {
+                el.attr('src', e.target.result);
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+}

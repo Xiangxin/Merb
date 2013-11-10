@@ -20,18 +20,22 @@ var ReviewView = Merb.View.extend({
 	 	var mdl = this.model;
 	 	var self = this;
 
+	 	coll.on("remove", function(oldReview){
+			self.remove();
+		});
+
 	    $.ajax({
 		    type: "delete",
         	url: url,
         	data: {'access_token': token},
 		    success: function(result) {
-		    	self.remove();
+		    	// self.remove();
 		    	coll.remove(mdl);
         	},
         	error: function (xhr, status, err) {
         		console.log(xhr);
         		if(xhr.status == 401) {
-        			alert('Sorry but can only delete your own reviews.');
+        			alert('Sorry but you can only delete your own reviews.');
         		}
        		}
     	});

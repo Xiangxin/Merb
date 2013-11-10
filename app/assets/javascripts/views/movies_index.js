@@ -7,13 +7,10 @@ var MoviesView = Merb.View.extend({
 		view = new MovieView({ model: model }); //create a MovieView object specifying the model
 
 		e1 = view.render();
-		//var img = $('<img/>').attr({ 'src' : model.get('img_url') })
-		//$(e1).append(img);
 
 		$('.row-movies').append(e1);
 	},
 });
-
 
 
 //Single Line Movie View in List
@@ -26,14 +23,9 @@ var MovieView = Merb.View.extend({
 
 	showMovie : function(){
 		AppRouterInst.navigate('/movies/' + this.model.id, true);
-		//AppRouter.show_Single_Movie(this.model.id);
 	},
 
-	render: function(){ //how to insert into <ul> tag
-		//return $(this.el).html(
-		//	"<div class='span3 movie'><h3 class='movie-title'>"+ this.model.get("title") +"</h3><img alt='A' src='"+ this.model.get("img_url") +"'></div>" );
-		//$(this.el.movie).attr("id",this.model.id);
-		//$(this.movie).attr("class","test");
+	render: function(){
 		$(this.el).attr("id",this.model.id);
 		$(this.el).attr("class","movie-view");
 		var template = _.template($("#movie-template").html(), {model: this.model.toJSON()});
@@ -55,9 +47,15 @@ var SingleMovieView = Merb.View.extend({
 	render: function () {
 		var template = _.template($("#single-movie-template").html(), {model: this.model.toJSON()});
 	 	this.$el.html(template);
+	 	
 	 	var reviews_view = new ReviewsView({collection:this.model.reviews});
 		reviews_view.render(this.model.reviews);
+		this.model.reviews.on("add", function(newReview){
+			reviews_view.addOne(newReview);
+		});
+
 		this.reviews_view = reviews_view;
+
 		if (!userLoggedIn()) {
 			$("#update_movie_btn").hide();
 			$("#delete-movie-btn").hide();
@@ -69,11 +67,11 @@ var SingleMovieView = Merb.View.extend({
 	},
 
 	update_movie: function() {
-		if(!userLoggedIn) {
+		if(!userLoggedIn()) {
 			alert("Sorry but please log in first!");
-			return;
+		} else {
+			window.location.href = "/#edit/" + this.model.id;
 		}
-		window.location.href = "/#edit/" + this.model.id;
 	},
 
 	delete_movie: function () {
@@ -81,7 +79,7 @@ var SingleMovieView = Merb.View.extend({
 		if (token == "" || token == null) {
 			alert("Sorry but please log in first!");
 			return;
-		}
+		} 
 
 		var id = this.model.id;
 
@@ -139,8 +137,7 @@ var SingleMovieView = Merb.View.extend({
 	            data.id = result.id;
 	            var newReview = new Review(data);
 	            newReview.collection = self.model.reviews;
-	            self.model.reviews.push(newReview);
-    			self.reviews_view.addOne(newReview);
+	            self.model.reviews.add(newReview);
     			$("#review_score").val('');
     			$("#review_comment").val('');
 	        },
@@ -153,14 +150,14 @@ var SingleMovieView = Merb.View.extend({
 });
 
 
-
 var UpdateMovieView = Merb.View.extend({
+
 	render: function(){
 
 		var template = _.template($("#update-movie-template").html(), {model: this.model.attributes});
 		$('.testa').html(template);
 
-		if (userLoggedIn()) {
+		if (!userLoggedIn()) {
 			alert("Sorry but please log in first!");
 			return;
 		}
@@ -177,10 +174,11 @@ var UpdateMovieView = Merb.View.extend({
 			var summary, title, img; 
 			title = $.trim($('#update_title').val());
 			summary = $.trim($('#update_summary').val());
-			img = $("update_image").val();
+			img = $("#update-movie-img").val();
 
-			if (title == "" || summary == "") {
+			if (title == "" || summary == "" || img == null) {
 		           alert("Please provide complete data!");
+		           return;
 		    } else {
 		    	   $("#update-btn").text("Updating...").attr('disabled', 'disabled');
 		           var formData = new FormData();
@@ -193,7 +191,7 @@ var UpdateMovieView = Merb.View.extend({
 		           if(img != "") {
 		           		formData.append('img', img);
 		           }
-		           formData.append("access_token", token);
+		           formData.append("access_token", getCookie('token'));
 		           $.ajax({
 		            	url: "http://cs3213.herokuapp.com/movies/" + id + ".json",
 		            	type: "put",
@@ -218,55 +216,71 @@ var UpdateMovieView = Merb.View.extend({
 		         }); 
 		    }
 		});    
+
+		$("#update-movie-img").change(function(ev){
+			changePreview(ev, $('#update-preview'));
+		});
 	},
 });
 
 
 
 var CreateMovieView = Merb.View.extend({
+
+	el: ".testa",
+
+	events : {
+		
+		"click #submit-btn": "submit_movie",
+		"change #movie_img": "change_preview",
+	},
+
     render: function() {
         var template = _.template($("#add-movie-template").html(), {});
         $('.testa').html(template);
-
-		$("#submit-btn").click(function(){
-
-			var token = getCookie('token');
-			console.log(token);
-
-			var summary, title, img; 
-			title = $.trim($('#movie_title').val());
-			summary = $.trim($('#movie_summary').val());
-			img = $('#movie_img').val();
-
-			
-				if (title == "" || summary == "" || img == "") {
-			           alert("Please provide complete data!");
-			    } else {
-			    	   $("#submit-btn").text("Creating...").attr('disabled', 'disabled');
-			           var formData = new FormData($("#new_movie_form")[0]);
-			           formData.append("access_token", token)
-			           $.ajax({
-			            	url: "http://cs3213.herokuapp.com/movies.json",
-			            	type: "post",
-			            	data: formData,
-			            	cache: false,
-			            	contentType: false,
-			            	processData: false,
-			            	error: function(jqXHR, textStatus, error) {
-	                    	 	console.log(textStatus + ": " + error);
-	                    	 	// alert('Your authentication has expired.');
-	                    	 	window.location.href = '/';
-	                    	 	$("#submit-btn").text("Create").removeAttr("disabled"); 
-	                  		}, 
-			            	success: function(data) {
-			            		console.log("success!");
-			            		$("#submit-btn").text("Create").removeAttr("disabled");
-			            	    window.location.href = "/#movies/" + data.id;
-			            	}
-			         }); 
-			    }
-			});    
         return this;
+    },
+
+    submit_movie: function(){
+
+		var token = getCookie('token');
+		console.log(token);
+
+		var summary, title, img; 
+		title = $.trim($('#movie_title').val());
+		summary = $.trim($('#movie_summary').val());
+		img = $('#movie_img').val();
+	
+		if (title == "" || summary == "" || img == "") {
+	           alert("Please provide complete data!");
+	    } else {
+	    	   $("#submit-btn").text("Creating...").attr('disabled', 'disabled');
+	           var formData = new FormData($("#new_movie_form")[0]);
+	           formData.append("access_token", token)
+	           $.ajax({
+	            	url: "http://cs3213.herokuapp.com/movies.json",
+	            	type: "post",
+	            	data: formData,
+	            	cache: false,
+	            	contentType: false,
+	            	processData: false,
+	            	error: function(jqXHR, textStatus, error) {
+                	 	console.log(textStatus + ": " + error);
+                	 	// alert('Your authentication has expired.');
+                	 	window.location.href = '/';
+                	 	$("#submit-btn").text("Create").removeAttr("disabled"); 
+              		}, 
+	            	success: function(data) {
+	            		console.log("success!");
+	            		$("#submit-btn").text("Create").removeAttr("disabled");
+	            	    window.location.href = "/#movies/" + data.id;
+	            	}
+	         }); 
+	    }
+	},
+
+    change_preview: function(ev){
+    	changePreview(ev, $('#preview'));
     },
 });
 
