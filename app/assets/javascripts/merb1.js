@@ -93,12 +93,23 @@
   ////////////////
 
   var Model = Merb.Model = function(attributes, options) {
-    var attrs = attributes || {};
-    options || (options = {});
+    //var attrs = attributes || {};
+    var attrs;
+    if (attributes) {
+      attrs = attributes;
+    } else {
+      attrs = {};
+    }
+    //options || (options = {});
+    if (! options) {
+      options = {};
+    }
     this.cid = _.uniqueId('c');
     this.attributes = {};
-    if (options.collection) this.collection = options.collection;
-    if (options.parse) attrs = this.parse(attrs, options) || {};
+    if (options.collection) 
+      this.collection = options.collection;
+    if (options.parse) 
+      attrs = this.parse(attrs, options) || {};
     this.set(attrs, options);
     this.changed = {};
     this.initialize.apply(this, arguments);

@@ -31,9 +31,21 @@ var AppView = Merb.View.extend({
                 }
                 var next_page_num = parseInt(pageNum) + 1;
 
+                if (movies.models.length < 30) {
+                    $('#nextPage').hide(); 
+                } else {
+                    $('#nextPage').show(); 
+                    $('#nextPage').attr("href", "/#page/"+next_page_num);
+                }
+
                 //set the html elements
-                $('#prevPage').attr("href", "/#page/"+prev_page_num);
-                $('#nextPage').attr("href", "/#page/"+next_page_num);
+                if (pageNum == 1) {
+                    $('#prevPage').hide();
+                } else {
+                    $('#prevPage').show();
+                    $('#prevPage').attr("href", "/#page/"+prev_page_num);
+                }
+               
 
             },
 
