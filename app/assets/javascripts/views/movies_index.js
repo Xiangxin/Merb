@@ -45,6 +45,7 @@ var SingleMovieView = Merb.View.extend({
 	},
 
 	render: function () {
+		console.log("token is "+getCookie("token"));
 		var template = _.template($("#single-movie-template").html(), {model: this.model.toJSON()});
 	 	this.$el.html(template);
 	 	
@@ -185,13 +186,24 @@ var UpdateMovieView = Merb.View.extend({
 
 		           console.log('new: ' + id + ", " + title + ", " + summary);
 
-		           formData.append('id', id);
-		           formData.append('title', title);
-		           formData.append('summary', summary);
+		           
+		           formData.append('movie[title]', title);
+		           formData.append('movie[summary]', summary);
 		           if(img != "") {
-		           		formData.append('img', img);
+		           		formData.append('movie[img]', img);
 		           }
 		           formData.append("access_token", getCookie('token'));
+		         /*  xReader("http://cs3213.herokuapp.com/movies/" + id + ".json", function(data) { 
+   								console.log(data);
+
+		            		$("#update-btn").text("Update").removeAttr("disabled");
+		            	    window.location.href = "/#movies/" + id;
+  							
+								},
+								{
+								method: "put",
+								content: formData
+								});*/
 		           $.ajax({
 		            	url: "http://cs3213.herokuapp.com/movies/" + id + ".json",
 		            	type: "put",
@@ -276,6 +288,9 @@ var CreateMovieView = Merb.View.extend({
 	            	    window.location.href = "/#movies/" + data.id;
 	            	}
 	         }); 
+					var new_movie = new Movie({
+
+					});	
 	    }
 	},
 
