@@ -1,43 +1,24 @@
 (function(){
 
   var Merb = this.Merb = {};
-  
+
   ////////////////
   // Merb Event //
   ////////////////
 
   var Events = Merb.Events = {
 
-    // Bind an event to a `callback` function. Passing `"all"` will bind
-    // the callback to all events fired.
     on: function(name, callback, context) {
-      if (!eventsApi(this, 'on', name, [callback, context]) || !callback) return this;
-      this._events || (this._events = {});
-      var events = this._events[name] || (this._events[name] = []);
-      events.push({callback: callback, context: context, ctx: context || this});
-      return this;
+        if (!callback) return this;
+        this._events || (this._events = {});
+        var events = this._events[name] || (this._events[name] = []);
+        events.push({callback: callback, context: context, ctx: context || this});
+        return this;
     },
 
-    // Bind an event to only be triggered a single time. After the first time
-    // the callback is invoked, it will be removed.
-    once: function(name, callback, context) {
-      if (!eventsApi(this, 'once', name, [callback, context]) || !callback) return this;
-      var self = this;
-      var once = _.once(function() {
-        self.off(name, once);
-        callback.apply(this, arguments);
-      });
-      once._callback = callback;
-      return this.on(name, once, context);
-    },
-
-    // Remove one or many callbacks. If `context` is null, removes all
-    // callbacks with that function. If `callback` is null, removes all
-    // callbacks for the event. If `name` is null, removes all bound
-    // callbacks for all events.
     off: function(name, callback, context) {
       var retain, ev, events, names, i, l, j, k;
-      if (!this._events || !eventsApi(this, 'off', name, [callback, context])) return this;
+      if (!this._events) return this;
       if (!name && !callback && !context) {
         this._events = {};
         return this;
@@ -64,54 +45,17 @@
       return this;
     },
 
-    // Trigger one or many events, firing all bound callbacks. Callbacks are
-    // passed the same arguments as `trigger` is, apart from the event name
-    // (unless you're listening on `"all"`, which will cause your callback to
-    // receive the true name of the event as the first argument).
     trigger: function(name) {
       if (!this._events) return this;
       var args = [].slice.call(arguments, 1);
-      if (!eventsApi(this, 'trigger', name, args)) return this;
       var events = this._events[name];
       var allEvents = this._events.all;
       if (events) triggerEvents(events, args);
       if (allEvents) triggerEvents(allEvents, arguments);
       return this;
     },
-
-    // Tell this object to stop listening to either specific events ... or
-    // to every object it's currently listening to.
-    stopListening: function(obj, name, callback) {
-      var listeners = this._listeners;
-      if (!listeners) return this;
-      var deleteListener = !name && !callback;
-      if (typeof name === 'object') callback = this;
-      if (obj) (listeners = {})[obj._listenerId] = obj;
-      for (var id in listeners) {
-        listeners[id].off(name, callback, this);
-        if (deleteListener) delete this._listeners[id];
-      }
-      return this;
-    }
-
   };
 
-  var eventsApi = function(obj, action, name, rest) {
-    if (!name) return true;
-
-    // Handle event maps.
-    if (typeof name === 'object') {
-      for (var key in name) {
-        obj[action].apply(obj, [key, name[key]].concat(rest));
-      }
-      return false;
-    }
-    return true;
-  };
-
-  // A difficult-to-believe, but optimized internal dispatch function for
-  // triggering events. Tries to keep the usual cases speedy (most internal
-  // Merb events have 3 arguments).
   var triggerEvents = function(events, args) {
     var ev, i = -1, l = events.length, a1 = args[0], a2 = args[1], a3 = args[2];
     switch (args.length) {
@@ -123,21 +67,15 @@
     }
   };
 
-  var listenMethods = {listenTo: 'on', listenToOnce: 'once'};
-
-  // Inversion-of-control versions of `on` and `once`. Tell *this* object to
-  // listen to an event in another object ... keeping track of what it's
-  // listening to.
-  _.each(listenMethods, function(implementation, method) {
-    Events[method] = function(obj, name, callback) {
-      var listeners = this._listeners || (this._listeners = {});
-      var id = obj._listenerId || (obj._listenerId = _.uniqueId('l'));
-      listeners[id] = obj;
-      if (typeof name === 'object') callback = this;
-      obj[implementation](name, callback, this);
-      return this;
+    
+    Events["listenTo"] = function(obj, name, callback) {
+        var listeners = this._listeners || (this._listeners = {});
+        var id = obj._listenerId || (obj._listenerId = _.uniqueId('l'));
+        listeners[id] = obj;
+        if (typeof name === 'object') callback = this;
+        obj["on"](name, callback, this);
+        return this;
     };
-  });
 
   
   ////////////////
@@ -156,7 +94,6 @@
     this.initialize.apply(this, arguments);
   };
 
-  // Attach all inheritable methods to the Model prototype.
   _.extend(Model.prototype, Events, {
 
     initialize: function(){},
@@ -173,7 +110,6 @@
       var attr, attrs, unset, changes, silent, changing, prev, current;
       if (key == null) return this;
 
-      // Handle both `"key", value` and `{key: value}` -style arguments.
       if (typeof key === 'object') {
         attrs = key;
         options = val;
@@ -183,10 +119,8 @@
 
       options || (options = {});
 
-      // Run validation.
       if (!this._validate(attrs, options)) return false;
 
-      // Extract attributes and options.
       unset           = options.unset;
       silent          = options.silent;
       changes         = [];
@@ -201,7 +135,6 @@
 
       if ("id" in attrs) this.id = attrs["id"];
 
-      // For each `set` attribute, update or delete the current value.
       for (attr in attrs) {
         val = attrs[attr];
         if (!_.isEqual(current[attr], val)) changes.push(attr);
@@ -213,7 +146,6 @@
         unset ? delete current[attr] : current[attr] = val;
       }
 
-      // Trigger all relevant attribute changes.
       if (!silent) {
         if (changes.length) this._pending = true;
         for (var i = 0, l = changes.length; i < l; i++) {
@@ -221,8 +153,6 @@
         }
       }
 
-      // You might be wondering why there's a `while` loop here. Changes can
-      // be recursively nested within `"change"` events.
       if (changing) return this;
       if (!silent) {
         while (this._pending) {
@@ -249,64 +179,6 @@
       return this.sync('read', this, options);
     },
 
-    // Set a hash of model attributes, and sync the model to the server.
-    // If the server returns an attributes hash that differs, the model's
-    // state will be `set` again.
-    save: function(key, val, options) {
-      var attrs, method, xhr, attributes = this.attributes;
-
-      // Handle both `"key", value` and `{key: value}` -style arguments.
-      if (key == null || typeof key === 'object') {
-        attrs = key;
-        options = val;
-      } else {
-        (attrs = {})[key] = val;
-      }
-
-      // If we're not waiting and attributes exist, save acts as `set(attr).save(null, opts)`.
-      if (attrs && (!options || !options.wait) && !this.set(attrs, options)) return false;
-
-      options = _.extend({validate: true}, options);
-
-      // Do not persist invalid models.
-      if (!this._validate(attrs, options)) return false;
-
-      // Set temporary attributes if `{wait: true}`.
-      if (attrs && options.wait) {
-        this.attributes = _.extend({}, attributes, attrs);
-      }
-
-      // After a successful server-side save, the client is (optionally)
-      // updated with the server-side state.
-      if (options.parse === void 0) options.parse = true;
-      var model = this;
-      var success = options.success;
-      options.success = function(resp) {
-        // Ensure attributes are restored during synchronous saves.
-        model.attributes = attributes;
-        var serverAttrs = model.parse(resp, options);
-        if (options.wait) serverAttrs = _.extend(attrs || {}, serverAttrs);
-        if (_.isObject(serverAttrs) && !model.set(serverAttrs, options)) {
-          return false;
-        }
-        if (success) success(model, resp, options);
-        model.trigger('sync', model, resp, options);
-      };
-      // wrapError(this, options);
-
-      method = this.isNew() ? 'create' : (options.patch ? 'patch' : 'update');
-      if (method === 'patch') options.attrs = attrs;
-      xhr = this.sync(method, this, options);
-
-      // Restore attributes.
-      if (attrs && options.wait) this.attributes = attributes;
-
-      return xhr;
-    },
-
-    // Destroy this model on the server if it was already persisted.
-    // Optimistically removes the model from its collection, if it has one.
-    // If `wait: true` is passed, waits for the server to respond before removal.
     destroy: function(options) {
       options = options ? _.clone(options) : {};
       var model = this;
@@ -326,21 +198,16 @@
         options.success();
         return false;
       }
-      // wrapError(this, options);
 
       var xhr = this.sync('delete', this, options);
       if (!options.wait) destroy();
       return xhr;
     },
 
-    // **parse** converts a response into the hash of attributes to be `set` on
-    // the model. The default implementation is just to pass the response along.
     parse: function(resp, options) {
       return resp;
     },
 
-    // // Run validation against the next complete set of model attributes,
-    // // returning `true` if all is well. Otherwise, fire an `"invalid"` event.
     _validate: function(attrs, options) {
       if (!options.validate || !this.validate) return true;
       attrs = _.extend({}, this.attributes, attrs);
@@ -353,7 +220,6 @@
   });
 
 
-
   /////////////////////
   // Merb Collection //
   /////////////////////
@@ -362,7 +228,6 @@
       this._reset();
   };
 
-  // Define the Collection's inheritable methods.
   _.extend(Collection.prototype, Events, {
 
         model: Model,
@@ -428,13 +293,10 @@
           return this.sync('read', this, options);
         },
 
-        // The JSON representation of a Collection is an array of the
-        // models' attributes.
         toJSON: function(options) {
           return this.map(function(model){ return model.toJSON(options); });
         },
 
-        // Proxy `Merb.sync` by default.
         sync: function() {
           return Merb.sync.apply(this, arguments);
         },
@@ -444,8 +306,6 @@
           return this._byId[obj.id != null ? obj.id : obj.cid || obj];
         },
 
-        // Prepare a hash of attributes (or other model) to be added to this
-        // collection.
         _prepareModel: function(attrs, options) {
           if (attrs instanceof Model) {
             if (!attrs.collection) attrs.collection = this;
@@ -461,16 +321,11 @@
           return model;
         },
 
-        // Internal method to sever a model's ties to a collection.
         _removeReference: function(model) {
           if (this === model.collection) delete model.collection;
           model.off('all', this._onModelEvent, this);
         },
 
-        // Internal method called every time a model in the set fires an event.
-        // Sets need to update their indexes when models change ids. All other
-        // events simply proxy through. "add" and "remove" events that originate
-        // in other collections are ignored.
         _onModelEvent: function(event, model, collection, options) {
           if ((event === 'add' || event === 'remove') && collection !== this) return;
           if (event === 'destroy') this.remove(model, options);
@@ -510,7 +365,6 @@
 
         remove: function() {
           this.$el.remove();
-          this.stopListening();
           return this;
         },
 
@@ -566,57 +420,32 @@
 });
 
 
+/////////////
+//  Sync   //
+/////////////
 
   Merb.sync = function(method, model, options) {
     var type = methodMap[method];
 
-    var params = {type: type, dataType: 'json'};
+    var params = {type: type, dataType: 'json', contentType :'application/json' };
 
     if (!options.url) {
       throw new Error("Merb Doesn't know where to fetch. URL is missing.");
     }
 
-    // Ensure that we have the appropriate request data.
     if (options.data == null && model && (method === 'create' || method === 'update' || method === 'patch')) {
-      params.contentType = 'application/json';
       params.data = JSON.stringify(options.attrs || model.toJSON(options));
     }
 
-    // For older servers, emulate HTTP by mimicking the HTTP method with `_method`
-    // And an `X-HTTP-Method-Override` header.
-    if (options.emulateHTTP && (type === 'PUT' || type === 'DELETE' || type === 'PATCH')) {
-      params.type = 'POST';
-      if (options.emulateJSON) params.data._method = type;
-      var beforeSend = options.beforeSend;
-      options.beforeSend = function(xhr) {
-        xhr.setRequestHeader('X-HTTP-Method-Override', type);
-        if (beforeSend) return beforeSend.apply(this, arguments);
-      };
-    }
-
-    // Don't process data on a non-GET request.
     if (params.type !== 'GET' && !options.emulateJSON) {
       params.processData = false;
     }
 
-    // If we're sending a `PATCH` request, and we're in an old Internet Explorer
-    // that still has ActiveX enabled by default, override jQuery to use that
-    // for XHR instead. Remove this line when jQuery supports `PATCH` on IE8.
-    if (params.type === 'PATCH' && noXhrPatch) {
-      params.xhr = function() {
-        return new ActiveXObject("Microsoft.XMLHTTP");
-      };
-    }
-
-    // Make the request, allowing the user to override any Ajax options.
     var xhr = options.xhr = $.ajax(_.extend(params, options));
     model.trigger('request', model, xhr, options);
     return xhr;
   };
 
-  var noXhrPatch = typeof window !== 'undefined' && !!window.ActiveXObject && !(window.XMLHttpRequest && (new XMLHttpRequest).dispatchEvent);
-
-  // Map from CRUD to HTTP for our default `Merb.sync` implementation.
   var methodMap = {
     'create': 'POST',
     'update': 'PUT',

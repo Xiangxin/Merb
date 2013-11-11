@@ -47,7 +47,7 @@ var AppView = Merb.View.extend({
 
         movie.fetch({
 
-            url: "http://cs3213.herokuapp.com/movies/" + movie_id + ".json", 
+            url: "http://cs3213.herokuapp.com/movies/" + movie_id + ".json",
 
             success : function(thisMovie){
                 thisMovie.reviews.fetch({
