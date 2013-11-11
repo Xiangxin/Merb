@@ -21,7 +21,8 @@
                         <span class="icon-bar"></span>
                         <span class="icon-bar"></span>
                     </a>
-                    <%= link_to "MoviesApp", '/', :onclick => 'AppViewInst.showPage(1)', class:'brand' %>
+                    <!-- <%= link_to "MoviesApp", '/#page/1', :onclick => 'AppViewInst.showPage(1)', class:'brand' %> -->
+                    <%= link_to "MoviesApp", '/', :onclick => "AppRouterInst.navigate('/index', true)", class:'brand' %>
 
                     <div class="container nav-collapse">
                         <ul class="nav pull-right">     

@@ -1,6 +1,7 @@
 var AppRouter = Merb.Router.extend({
       routes: {
             //Display Page
+            "index"           : "index",
             ""                 : "index",
             "#/"               : "index",
             "page/:page_num"   : "show_page", 
