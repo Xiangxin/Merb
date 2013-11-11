@@ -1,71 +1,42 @@
 (function(){
 
-  var Merb = this.Merb = {};
+    var Merb = this.Merb = {};
 
-  ////////////////
-  // Merb Event //
-  ////////////////
+    ////////////////
+    // Merb Event //
+    ////////////////
 
-  var Events = Merb.Events = {
+    var Events = Merb.Events = {
 
-    on: function(name, callback, context) {
-        if (!callback) return this;
-        this._events || (this._events = {});
-        var events = this._events[name] || (this._events[name] = []);
-        events.push({callback: callback, context: context, ctx: context || this});
-        return this;
-    },
+        on: function(name, callback, context) {
+            if (!callback) return this;
+            this._events || (this._events = {});
+            var events = this._events[name] || (this._events[name] = []);
+            events.push({callback: callback, context: context, ctx: context || this});
+            return this;
+        },
 
-    off: function(name, callback, context) {
-      var retain, ev, events, names, i, l, j, k;
-      if (!this._events) return this;
-      if (!name && !callback && !context) {
-        this._events = {};
-        return this;
-      }
+        trigger: function(name) {
+            if (!this._events) return this;
+            var args = [].slice.call(arguments, 1);
+            var events = this._events[name];
+            var allEvents = this._events.all;
+            if (events) triggerEvents(events, args);
+            if (allEvents) triggerEvents(allEvents, arguments);
+            return this;
+        },
+    };
 
-      names = name ? [name] : _.keys(this._events);
-      for (i = 0, l = names.length; i < l; i++) {
-        name = names[i];
-        if (events = this._events[name]) {
-          this._events[name] = retain = [];
-          if (callback || context) {
-            for (j = 0, k = events.length; j < k; j++) {
-              ev = events[j];
-              if ((callback && callback !== ev.callback && callback !== ev.callback._callback) ||
-                  (context && context !== ev.context)) {
-                retain.push(ev);
-              }
-            }
-          }
-          if (!retain.length) delete this._events[name];
+    var triggerEvents = function(events, args) {
+        var ev, i = -1, l = events.length, a1 = args[0], a2 = args[1], a3 = args[2];
+        switch (args.length) {
+          case 0: while (++i < l) (ev = events[i]).callback.call(ev.ctx); return;
+          case 1: while (++i < l) (ev = events[i]).callback.call(ev.ctx, a1); return;
+          case 2: while (++i < l) (ev = events[i]).callback.call(ev.ctx, a1, a2); return;
+          case 3: while (++i < l) (ev = events[i]).callback.call(ev.ctx, a1, a2, a3); return;
+          default: while (++i < l) (ev = events[i]).callback.apply(ev.ctx, args);
         }
-      }
-
-      return this;
-    },
-
-    trigger: function(name) {
-      if (!this._events) return this;
-      var args = [].slice.call(arguments, 1);
-      var events = this._events[name];
-      var allEvents = this._events.all;
-      if (events) triggerEvents(events, args);
-      if (allEvents) triggerEvents(allEvents, arguments);
-      return this;
-    },
-  };
-
-  var triggerEvents = function(events, args) {
-    var ev, i = -1, l = events.length, a1 = args[0], a2 = args[1], a3 = args[2];
-    switch (args.length) {
-      case 0: while (++i < l) (ev = events[i]).callback.call(ev.ctx); return;
-      case 1: while (++i < l) (ev = events[i]).callback.call(ev.ctx, a1); return;
-      case 2: while (++i < l) (ev = events[i]).callback.call(ev.ctx, a1, a2); return;
-      case 3: while (++i < l) (ev = events[i]).callback.call(ev.ctx, a1, a2, a3); return;
-      default: while (++i < l) (ev = events[i]).callback.apply(ev.ctx, args);
-    }
-  };
+    };
 
     
     Events["listenTo"] = function(obj, name, callback) {
@@ -176,7 +147,7 @@
         if (success) success(model, resp, options);
           model.trigger('sync', model, resp, options);
       };
-      return this.sync('read', this, options);
+      return this.sync('get', this, options);
     },
 
     destroy: function(options) {
@@ -290,7 +261,7 @@
             
             collection.trigger('sync', collection, resp, options);
           };
-          return this.sync('read', this, options);
+          return this.sync('get', this, options);
         },
 
         toJSON: function(options) {
@@ -307,23 +278,22 @@
         },
 
         _prepareModel: function(attrs, options) {
-          if (attrs instanceof Model) {
-            if (!attrs.collection) attrs.collection = this;
-            return attrs;
-          }
-          options || (options = {});
-          options.collection = this;
-          var model = new this.model(attrs, options);
-          if (!model._validate(attrs, options)) {
-            this.trigger('invalid', this, attrs, options);
-            return false;
-          }
-          return model;
+            if (attrs instanceof Model) {
+              if (!attrs.collection) attrs.collection = this;
+              return attrs;
+            }
+            options || (options = {});
+            options.collection = this;
+            var model = new this.model(attrs, options);
+            if (!model._validate(attrs, options)) {
+              this.trigger('invalid', this, attrs, options);
+              return false;
+            }
+            return model;
         },
 
         _removeReference: function(model) {
           if (this === model.collection) delete model.collection;
-          model.off('all', this._onModelEvent, this);
         },
 
         _onModelEvent: function(event, model, collection, options) {
@@ -416,43 +386,29 @@
           _.extend(this, _.pick(options, viewOptions));
           this.options = options;
         },
-
-});
+    });
 
 
 /////////////
 //  Sync   //
 /////////////
 
-  Merb.sync = function(method, model, options) {
-    var type = methodMap[method];
+    Merb.sync = function(method, model, options) {
 
-    var params = {type: type, dataType: 'json', contentType :'application/json' };
+        var params = {type: method, dataType: 'json', contentType:'application/json'};
 
-    if (!options.url) {
-      throw new Error("Merb Doesn't know where to fetch. URL is missing.");
-    }
+        if (!options.url) {
+          throw new Error("Merb Doesn't know where to fetch. URL is missing.");
+        }
 
-    if (options.data == null && model && (method === 'create' || method === 'update' || method === 'patch')) {
-      params.data = JSON.stringify(options.attrs || model.toJSON(options));
-    }
+        if (options.data == null && model && (method === 'POST' || method === 'PUT')) {
+            params.data = JSON.stringify(options.attrs || model.toJSON(options));
+        }
 
-    if (params.type !== 'GET' && !options.emulateJSON) {
-      params.processData = false;
-    }
-
-    var xhr = options.xhr = $.ajax(_.extend(params, options));
-    model.trigger('request', model, xhr, options);
-    return xhr;
-  };
-
-  var methodMap = {
-    'create': 'POST',
-    'update': 'PUT',
-    'patch':  'PATCH',
-    'delete': 'DELETE',
-    'read':   'GET'
-  };
+        var xhr = options.xhr = $.ajax(_.extend(params, options));
+        model.trigger('request', model, xhr, options);
+        return xhr;
+    };
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -520,7 +476,6 @@
           });
         }
   });
-
 
   ///////////////
   //  History  //
