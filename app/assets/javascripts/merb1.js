@@ -9,19 +9,9 @@
     var Events = Merb.Events = {
 
         on: function(name, callback, context) {
-            if (!callback) 
-              return this;
-            if (! this._events) {
-              this._events = {};
-            }
-            //this._events || (this._events = {});
-            //var events = this._events[name] || (this._events[name] = []);
-            var events;
-            if (this._events[name]) {
-              events = this._events[name];
-            } else {
-              events = this._events = [];
-            }
+            if (!callback) return this;
+            this._events || (this._events = {});
+            var events = this._events[name] || (this._events[name] = []);
             events.push({callback: callback, context: context, ctx: context || this});
             return this;
         },
@@ -31,58 +21,29 @@
             var args = [].slice.call(arguments, 1);
             var events = this._events[name];
             var allEvents = this._events.all;
-            if (events) {
-              triggerEvents(events, args);
-            }
-            if (allEvents) {
-              triggerEvents(allEvents, arguments);
-            }
+            if (events) triggerEvents(events, args);
+            if (allEvents) triggerEvents(allEvents, arguments);
             return this;
         },
     };
 
     var triggerEvents = function(events, args) {
-        //var ev, i = -1, l = events.length, a1 = args[0], a2 = args[1], a3 = args[2];
-        /*switch (args.length) {
+        var ev, i = -1, l = events.length, a1 = args[0], a2 = args[1], a3 = args[2];
+        switch (args.length) {
           case 0: while (++i < l) (ev = events[i]).callback.call(ev.ctx); return;
           case 1: while (++i < l) (ev = events[i]).callback.call(ev.ctx, a1); return;
           case 2: while (++i < l) (ev = events[i]).callback.call(ev.ctx, a1, a2); return;
           case 3: while (++i < l) (ev = events[i]).callback.call(ev.ctx, a1, a2, a3); return;
           default: while (++i < l) (ev = events[i]).callback.apply(ev.ctx, args);
-        }*/
-        var ev;
-        if (args.length == 0) {
-          for (var i = 0; i < events.length; i++) {
-            ev = events[i];
-            ev.callback.call(ev.ctx);
-          }
-        } else {
-          for (var i = 0; i < events.length; i++) {
-            ev = events[i];
-            ev.callback.apply(ev.ctx, args);
-          }
         }
     };
 
     
     Events["listenTo"] = function(obj, name, callback) {
-        //var listeners = this._listeners || (this._listeners = {});
-        var listeners;
-        if (this._listeners) {
-          listeners = this._listeners;
-        } else {
-          listeners = this._listeners = {};
-        }
-        //var id = obj._listenerId || (obj._listenerId = _.uniqueId('l'));
-        var id;
-        if (obj._listenerId) {
-          id = obj._listenerId;
-        } else {
-          id = obj._listenerId = _.uniqueId('l');
-        }
+        var listeners = this._listeners || (this._listeners = {});
+        var id = obj._listenerId || (obj._listenerId = _.uniqueId('l'));
         listeners[id] = obj;
-        if (typeof name === 'object') 
-          callback = this;
+        if (typeof name === 'object') callback = this;
         obj["on"](name, callback, this);
         return this;
     };
@@ -93,23 +54,12 @@
   ////////////////
 
   var Model = Merb.Model = function(attributes, options) {
-    //var attrs = attributes || {};
-    var attrs;
-    if (attributes) {
-      attrs = attributes;
-    } else {
-      attrs = {};
-    }
-    //options || (options = {});
-    if (! options) {
-      options = {};
-    }
+    var attrs = attributes || {};
+    options || (options = {});
     this.cid = _.uniqueId('c');
     this.attributes = {};
-    if (options.collection) 
-      this.collection = options.collection;
-    if (options.parse) 
-      attrs = this.parse(attrs, options) || {};
+    if (options.collection) this.collection = options.collection;
+    if (options.parse) attrs = this.parse(attrs, options) || {};
     this.set(attrs, options);
     this.changed = {};
     this.initialize.apply(this, arguments);
